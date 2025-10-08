@@ -1,5 +1,7 @@
 # Product-Recommendation-ChaBot
 
+- Recommended to use python 3.13
+
 1. **Create a virtuval environment & Activate the virtual environment**
     ```sh
     python3 -m venv <name_of_virtual_env>
