@@ -6,7 +6,7 @@ router = APIRouter()
 @router.get("/")
 def home():
     """Health check endpoint."""
-    return {"message": "Chatbot API is running with GPU support!"}
+    return {"message": "Chatbot API is up!!"}
 
 @router.get("/health")
 def health_check():

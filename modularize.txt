@@ -1,29 +1,32 @@
-root/
-├-- main.py                          # FastAPI app entry point
-├-- config/
-│   ├-- __init__.py
-│   └-- settings.py                  # Configuration and environment variables
-├-- models/
-│   ├-- __init__.py
-│   ├-- ai_models.py                 # AI model initialization (CLIP, SentenceTransformer)
-│   └-- schemas.py                   # Pydantic models for request/response
-├-- database/
-│   ├-- __init__.py
-│   ├-- chroma_db.py                 # ChromaDB operations
-│   └-- firestore_db.py              # Firestore operations
-├-- services/
-│   ├-- __init__.py
-│   ├-- chatbot_service.py           # Chatbot logic
-│   ├-- search_service.py            # Product and order search
-│   ├-- image_service.py             # Image processing and search
-│   ├-- email_service.py             # Email sending functionality
-│   └-- storage_service.py           # Google Cloud Storage operations
-├-- utils/
-│   ├-- __init__.py
-│   ├-- data_formatter.py            # Data formatting utilities
-│   └-- json_parser.py               # JSON parsing and cleaning
-├-- routes/
-│   ├-- __init__.py
-│   ├-- chat_routes.py               # Chat endpoints
-│   └-- health_routes.py             # Health check endpoints
-└-- requirements.txt
+.
+├── app
+│   ├── __init__.py
+│   ├── api
+│   │   ├── chat.py
+│   │   └── health.py
+│   ├── config.py
+│   ├── database
+│   │   ├── __init__.py
+│   │   ├── chromadb.py
+│   │   └── firestore.py
+│   ├── dependencies.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   └── schemas.py
+│   ├── services
+│   │   ├── __init__.py
+│   │   ├── chatbot.py
+│   │   ├── email_service.py
+│   │   ├── embeddings.py
+│   │   ├── image_search.py
+│   │   └── search.py
+│   └── utils
+│       ├── formatters.py
+│       └── parsers.py
+├── csv_files
+│   ├── order table.csv
+│   ├── policies.csv
+│   └── Updated_Essilor_Products.csv
+├── main.py
+├── README.md
+└── requirements.txt

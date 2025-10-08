@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Body, File, UploadFile, Form
-from google.cloud import firestore, storage
+from google.cloud import storage
 from app.models.schemas import ChatRequest, ChatResponse
 from app.dependencies import get_dependencies
 from app.config import settings
@@ -195,50 +195,50 @@ async def chat_with_image(
             ])
             
             hybrid_prompt = f"""
-The user uploaded an image of glasses and also provided this message: "{user_input}"
+                The user uploaded an image of glasses and also provided this message: "{user_input}"
 
-Here are the products most visually similar to their image:
-{product_info}
+                Here are the products most visually similar to their image:
+                {product_info}
 
-Please analyze both the image search results and their text query to provide a helpful response.
-If they're asking for modifications (like different color, shape, price range) to what they uploaded,
-recommend the most appropriate products from the list above.
+                Please analyze both the image search results and their text query to provide a helpful response.
+                If they're asking for modifications (like different color, shape, price range) to what they uploaded,
+                recommend the most appropriate products from the list above.
 
-Return a JSON response in this exact format:
+                Return a JSON response in this exact format:
 
-{{
-  "chatbot_response": "Your helpful response here explaining your recommendations",
-  "products": [
-    {{
-      "Product Name": "Product 1",
-      "Price": 1000,
-      "Brand Name": "Brand A",
-      "Discount": "10%",
-      "Activity": "Outdoor",
-      "Face Shape": "Round",
-      "Product Type": "Sunglasses",
-      "Image URL": "http://example.com/image1.jpg",
-      "Prescription Type": "Single Vision",
-      "Frame Colour": "Black",
-      "Lens Color": "Gray"
-    }},
-    {{
-      "Product Name": "Product 2",
-      "Price": 1200,
-      "Brand Name": "Brand B",
-      "Discount": "15%",
-      "Activity": "Sports",
-      "Face Shape": "Oval",
-      "Product Type": "Eyeglasses",
-      "Image URL": "http://example.com/image2.jpg",
-      "Prescription Type": "Progressive",
-      "Frame Colour": "Blue",
-      "Lens Color": "Brown"
-    }}
-  ]
-}}
-"""
-            
+                {{
+                "chatbot_response": "Your helpful response here explaining your recommendations",
+                "products": [
+                    {{
+                    "Product Name": "Product 1",
+                    "Price": 1000,
+                    "Brand Name": "Brand A",
+                    "Discount": "10%",
+                    "Activity": "Outdoor",
+                    "Face Shape": "Round",
+                    "Product Type": "Sunglasses",
+                    "Image URL": "http://example.com/image1.jpg",
+                    "Prescription Type": "Single Vision",
+                    "Frame Colour": "Black",
+                    "Lens Color": "Gray"
+                    }},
+                    {{
+                    "Product Name": "Product 2",
+                    "Price": 1200,
+                    "Brand Name": "Brand B",
+                    "Discount": "15%",
+                    "Activity": "Sports",
+                    "Face Shape": "Oval",
+                    "Product Type": "Eyeglasses",
+                    "Image URL": "http://example.com/image2.jpg",
+                    "Prescription Type": "Progressive",
+                    "Frame Colour": "Blue",
+                    "Lens Color": "Brown"
+                    }}
+                ]
+                }}
+                """
+                            
             try:
                 # Get AI response for hybrid search
                 response = deps.agent.run(hybrid_prompt).content
