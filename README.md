@@ -2,7 +2,7 @@
 
 - Recommended to use python 3.13
 
-1. **Create a virtuval environment & Activate the virtual environment**
+1. **Create a virtuval environment & Activate the virtual environment** (MacOS)
     ```sh
     python3 -m venv <name_of_virtual_env>
     source <name_of_virtual_env>/bin/activate
