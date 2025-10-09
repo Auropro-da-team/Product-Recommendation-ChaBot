@@ -4,8 +4,8 @@ import torch
 import open_clip
 from sentence_transformers import SentenceTransformer
 from agno.agent import Agent
-from agno.models.groq import Groq
-# from agno.models.openai import OpenAIChat 
+# from agno.models.groq import Groq
+from agno.models.openai import OpenAIChat
 from google.cloud import storage
 from app.config import settings
 from app.database.firestore import FirestoreDB
@@ -27,8 +27,8 @@ class Dependencies:
         logger.info(f"Using device: {self.device}")
         
         # Initialize AI agent
-        self.agent = Agent(model=Groq(id=settings.GROQ_MODEL_ID), markdown=True)
-        # self.agent = Agent(model=OpenAI(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL_NAME), markdown=True)
+        # self.agent = Agent(model=Groq(id=settings.GROQ_MODEL_ID), markdown=True)
+        self.agent = Agent(model=OpenAIChat(api_key=settings.OPENAI_API_KEY), markdown=True)
 
         logger.info("AI Agent initialized")
         

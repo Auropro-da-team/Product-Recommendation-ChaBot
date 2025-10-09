@@ -37,10 +37,11 @@ class Settings:
     DEFAULT_TOP_K = 3
     IMAGE_SIMILARITY_THRESHOLD = 0.45
     
-    # AI Model Configuration
-    GROQ_MODEL_ID = "llama-3.3-70b-versatile"
-    # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
-    # OPENAI_MODEL_NAME: str = os.getenv("OPENAI_MODEL_NAME", "gpt-4o")
+    # AI Model Configurationgit add .
+
+    # GROQ_MODEL_ID = "llama-3.3-70b-versatile"
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    OPENAI_MODEL_NAME: str = os.getenv("OPENAI_MODEL_NAME", "gpt-4o")
 
     # CORS Configuration
     CORS_ORIGINS = ["*"]
