@@ -47,11 +47,12 @@ Conversation History:
 User: {user_input}
 
 Before responding, determine if the user is asking about glasses/products or about orders.
-When the user asks something about an order, set run_retrieval_orders = true. 
-
-When the user asks for an invoice AND their order ID is NOT in conversation history, you need to ask the user for their order ID and set send_invoice_email=false AND run_retrieval_orders=false
 
 Only set run_retrieval_orders=true AND send_invoice_email=true when you have an actual order ID to search for (like O1001, O1023, etc.).
+
+For vague order queries like "my last order", "show my orders", "what did I order", or any similar queries, set run_retrieval_orders = false and ask for their order ID or another clarifying question to look up the order.
+
+When the user asks for an invoice AND their order ID is NOT in conversation history, you need to ask the user for their order ID and set send_invoice_email=false AND run_retrieval_orders=false
 
 Before responding, make sure that the product or order the user is looking for is actually in the database when run_retrieval_products or run_retrieval_orders = true. *Do not hallucinate*.
 
@@ -64,9 +65,14 @@ Return a JSON response in the *exact* format below:
   "send_invoice_email": true or false
 }}
 
-If the user is asking about products (like styles, prices, specific glasses), set "run_retrieval_products": true.
+If the user is asking about SPECIFIC products (like "sunglasses under 2000", "Ray-Ban aviators", "glasses for oval face", "glasses for grey suit", "top 3 glasses for X"), set "run_retrieval_products": true.
+For vague queries like "I need glasses" or "show me eyewear", set "run_retrieval_products": false and ask clarifying questions.
+
 If the user is asking about orders (like order status, delivery date, specific order ID), set "run_retrieval_orders": true.
-If the user asks a general query about something like a fashion choice related to some particular glasses OR trivia questions, then set both to false.
+
+IMPORTANT: If the user asks for product recommendations for fashion/outfit matching (like "glasses for grey suit", "sunglasses for beach outfit"), treat this as a SPECIFIC product query and set "run_retrieval_products": true.
+
+For general trivia questions NOT related to product recommendations (like "who invented sunglasses?", "how to clean glasses?"), set both to false.
 """
         
         raw_response = self.agent.run(prompt).content
@@ -86,7 +92,7 @@ If the user asks a general query about something like a fashion choice related t
         if response_json.get("run_retrieval_products", False):
             retrieved_products = self.search_service.search_products(user_input)
             
-            if retrieved_products:
+            if retrieved_products and len(retrieved_products) > 0:
                 product_info = "\n".join([
                     f"🕶 {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
                     f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, "
@@ -193,6 +199,10 @@ If an order does not exist in the database, tell the user that politely.
                     # Keep the original chatbot response (it already asks for order ID)
                     response_json["send_invoice_email"] = False
                     logger.info("No orders found - keeping original response asking for order ID")
+                else:
+                    # For general order queries with no results - ask for order ID
+                    response_json["chatbot_response"] = "I'd be happy to help you find your order details! Could you please provide your order ID (e.g., O1001) so I can look it up for you?"
+                    logger.info("No orders found for vague query - asking for order ID")
         chatbot_response = response_json.get(
             "chatbot_response",
             "I'm sorry, I couldn't understand your request. Can you please clarify?"
