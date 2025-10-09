@@ -13,7 +13,6 @@ def health_check():
     """Detailed health check."""
     return {
         "status": "healthy",
-        "service": "Essilor Chatbot API",
-        "version": "1.0.0"
+        "service": "Essilor Chatbot API"
     }
 

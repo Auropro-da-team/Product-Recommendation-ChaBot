@@ -5,6 +5,7 @@ import open_clip
 from sentence_transformers import SentenceTransformer
 from agno.agent import Agent
 from agno.models.groq import Groq
+# from agno.models.openai import OpenAIChat 
 from google.cloud import storage
 from app.config import settings
 from app.database.firestore import FirestoreDB
@@ -27,6 +28,8 @@ class Dependencies:
         
         # Initialize AI agent
         self.agent = Agent(model=Groq(id=settings.GROQ_MODEL_ID), markdown=True)
+        # self.agent = Agent(model=OpenAI(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL_NAME), markdown=True)
+
         logger.info("AI Agent initialized")
         
         # Initialize Sentence Transformer

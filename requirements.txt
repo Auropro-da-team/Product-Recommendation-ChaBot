@@ -124,3 +124,5 @@ wcwidth==0.2.14
 websocket-client==1.8.0
 websockets==15.0.1
 zipp==3.23.0
+jiter==0.11.0
+openai==2.2.0

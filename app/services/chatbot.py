@@ -48,7 +48,10 @@ User: {user_input}
 
 Before responding, determine if the user is asking about glasses/products or about orders.
 When the user asks something about an order, set run_retrieval_orders = true. 
-When the user asks for an invoice AND their order ID is NOT in conversation history, you need to ask the user for their order ID and set send_invoice_email=true AND run_retrieval_orders=true
+
+When the user asks for an invoice AND their order ID is NOT in conversation history, you need to ask the user for their order ID and set send_invoice_email=false AND run_retrieval_orders=false
+
+Only set run_retrieval_orders=true AND send_invoice_email=true when you have an actual order ID to search for (like O1001, O1023, etc.).
 
 Before responding, make sure that the product or order the user is looking for is actually in the database when run_retrieval_products or run_retrieval_orders = true. *Do not hallucinate*.
 
@@ -174,17 +177,22 @@ If an order does not exist in the database, tell the user that politely.
                 
                 response_json["chatbot_response"] = self.agent.run(order_retrieval_prompt).content
                 logger.info(f"Order retrieval response: {response_json['chatbot_response']}")
+#             else:
+#                 # If no orders found but invoice was requested
+#                 if response_json.get("send_invoice_email", False):
+#                     invoice_error_prompt = """
+# Ask the user politely for their order ID.
+# Keep the response conversational and helpful in 3-4 lines.
+# """
+#                     response_json["chatbot_response"] = self.agent.run(invoice_error_prompt).content
+#                     response_json["send_invoice_email"] = False
+#                     logger.info("Order retrieval for invoice sending failed - no orders found")
             else:
                 # If no orders found but invoice was requested
                 if response_json.get("send_invoice_email", False):
-                    invoice_error_prompt = """
-Ask the user politely for their order ID.
-Keep the response conversational and helpful in 3-4 lines.
-"""
-                    response_json["chatbot_response"] = self.agent.run(invoice_error_prompt).content
+                    # Keep the original chatbot response (it already asks for order ID)
                     response_json["send_invoice_email"] = False
-                    logger.info("Order retrieval for invoice sending failed - no orders found")
-        
+                    logger.info("No orders found - keeping original response asking for order ID")
         chatbot_response = response_json.get(
             "chatbot_response",
             "I'm sorry, I couldn't understand your request. Can you please clarify?"

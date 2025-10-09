@@ -14,9 +14,9 @@ class Settings:
     FIRESTORE_PROJECT_ID = os.getenv("FIRESTORE_PROJECT_ID", "prj-auropro-dev")
     
     # GCS Configuration
-    GCS_BUCKET_NAME = "essilor-eyewear"
-    GCS_IMAGE_BUCKET_NAME = "essilor-eyewear-images"
-    
+    GCS_BUCKET_NAME = "essilor-eyewear" # this bucket is for storing product images
+    GCS_IMAGE_BUCKET_NAME = "essilor-eyewear-images" # this bucket is for storing user uploaded images
+
     # Model Configuration
     HF_TOKEN = os.getenv("HF_TOKEN")
     # MODEL_PATH = "/root/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/"
@@ -39,7 +39,9 @@ class Settings:
     
     # AI Model Configuration
     GROQ_MODEL_ID = "llama-3.3-70b-versatile"
-    
+    # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    # OPENAI_MODEL_NAME: str = os.getenv("OPENAI_MODEL_NAME", "gpt-4o")
+
     # CORS Configuration
     CORS_ORIGINS = ["*"]
     CORS_ALLOW_CREDENTIALS = True
