@@ -1,4 +1,3 @@
-
 import logging
 import pandas as pd
 from typing import List, Dict, Any
@@ -49,9 +48,9 @@ class SearchService:
             results_df.drop(columns=["Price Difference"], inplace=True)
         
         return results_df[[
-            'Product Name', 'Price', 'Brand Name', 'Discount', 'Activity',
-            'Face Shape', 'Product Type', 'Image URL', 'Prescription Type',
-            'Frame Colour', 'Lens Color', 'Similarity Score'
+            'Product ID', 'Product Name', 'Price', 'Brand Name', 'Discount', 
+            'Activity', 'Face Shape', 'Product Type', 'Image URL', 
+            'Prescription Type', 'Frame Colour', 'Lens Color', 'Similarity Score'
         ]].to_dict(orient="records")
     
     def search_orders(
@@ -62,6 +61,7 @@ class SearchService:
     ) -> List[Dict[str, Any]]:
         """
         Search for orders using entity extraction and filtering.
+        SECURITY: Only fetch orders if Order ID, Email, or Customer Name is explicitly provided.
         
         Args:
             conversation_history: Formatted conversation history
@@ -69,7 +69,7 @@ class SearchService:
             top_k: Number of top results
             
         Returns:
-            List of order dictionaries
+            List of order dictionaries (empty if no identifier provided)
         """
         # Entity extraction via LLM
         extraction_prompt = f"""
@@ -78,10 +78,10 @@ Given this query about orders: {query} and the conversation history: {conversati
 Extract the following information:
 
 - **Order ID**: Extract strings that look like order IDs (e.g., "O1001", "o1023") even if the word "order" is not used.
-- **Customer name**: Extract if a specific person is clearly mentioned.
-- **Email**: Extract if an email address is directly stated.
+- **Customer Name**: Extract if a specific person's name is clearly mentioned (e.g., "John Doe", "Likith", "Asrith").
+- **Customer Email**: Extract if an email address is directly stated (e.g., "user@example.com").
 
-Do not infer or hallucinate information that is not present.
+CRITICAL: Do NOT infer or hallucinate information that is not EXPLICITLY present in the query or conversation history.
 
 Return your answer as a JSON with the following format:
 
@@ -90,14 +90,12 @@ Return your answer as a JSON with the following format:
   "customer_name": "The specific customer name mentioned (or null if none)",
   "email": "The specific email mentioned (or null if none)"
 }}
-
-Additional flags:
-- If the user is asking follow-up questions about products, set: run_retrieval_products: true
-- If the user is asking about an order (status, cancellation, etc.), set: run_retrieval_orders: true
 """
         
         entity_extraction_response = self.agent.run(extraction_prompt).content
         extracted_entities = clean_chatbot_response(entity_extraction_response)
+        
+        logger.info(f"Extracted entities: {extracted_entities}")
         
         # Normalize order_id into a list
         order_ids = extracted_entities.get("order_id")
@@ -109,18 +107,63 @@ Additional flags:
         else:
             order_ids = []
         
-        # Filter by exact match if order IDs are present
+        # Extract customer name
+        customer_name = extracted_entities.get("customer_name")
+        if customer_name and customer_name != "null" and isinstance(customer_name, str):
+            customer_name = customer_name.strip()
+        else:
+            customer_name = None
+        
+        # Extract email
+        email = extracted_entities.get("email")
+        if email and email != "null" and isinstance(email, str):
+            email = email.strip()
+        else:
+            email = None
+        
+        # SECURITY FIX: Only proceed if we have at least ONE explicit identifier
+        if not order_ids and not email and not customer_name:
+            logger.warning("Order search attempted without any identifier (Order ID, Email, or Customer Name) - returning empty for security")
+            return []
+        
+        logger.info(f"Searching orders with - Order IDs: {order_ids}, Email: {email}, Customer Name: {customer_name}")
+        
+        # Fetch all orders for filtering
+        all_matches = self.chroma_manager.get_all_orders()
+        matched_orders = []
+        
+        if not all_matches or "metadatas" not in all_matches:
+            return []
+        
+        # Filter by Order ID (highest priority)
         if order_ids:
-            all_matches = self.chroma_manager.get_all_orders()
-            matched_orders = []
-            
             for metadata in all_matches["metadatas"]:
                 if metadata and "Order ID" in metadata:
                     for oid in order_ids:
                         if oid.lower() in metadata["Order ID"].lower():
                             matched_orders.append(metadata)
-            
+            logger.info(f"Found {len(matched_orders)} orders matching Order IDs: {order_ids}")
             return matched_orders
         
+        # Filter by Email
+        if email:
+            for metadata in all_matches["metadatas"]:
+                if metadata and "Email ID" in metadata:
+                    if email.lower() in metadata["Email ID"].lower():
+                        matched_orders.append(metadata)
+            logger.info(f"Found {len(matched_orders)} orders matching Email: {email}")
+            if matched_orders:
+                return matched_orders
+        
+        # Filter by Customer Name
+        if customer_name:
+            for metadata in all_matches["metadatas"]:
+                if metadata and "Customer Name" in metadata:
+                    # Case-insensitive partial match for names
+                    if customer_name.lower() in metadata["Customer Name"].lower():
+                        matched_orders.append(metadata)
+            logger.info(f"Found {len(matched_orders)} orders matching Customer Name: {customer_name}")
+            if matched_orders:
+                return matched_orders
+        
         return []
-

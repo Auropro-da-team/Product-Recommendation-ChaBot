@@ -89,7 +89,7 @@ class ImageSearchService:
                         "Product Name": meta["Product Name"],
                         "Brand Name": meta["Brand Name"],
                         "Price": meta["Price"],
-                        "Discount": meta["Dicount"],
+                        "Discount": meta["Discount"],
                         "Activity": meta["Activity"],
                         "Face Shape": meta["Face Shape"],
                         "Product Type": meta["Product Type"],

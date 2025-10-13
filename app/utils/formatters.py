@@ -6,7 +6,7 @@ def format_description_v2(row: pd.Series) -> str:
     return (
         f"{row['Product Name']}, {row['Product Type']}, {row['Brand Name']}, "
         f"suitable for {row['Activity']}, face shape {row['Face Shape']}, "
-        f"price {row['Price']} with a discount of {row['Dicount']}%. "
+        f"price {row['Price']} with a discount of {row['Discount']}%. "
         f"Image: {row['Image URL']}, "
         f"frame color {row['Frame Colour']} and lens color {row['Lens Color']}"
     )
