@@ -35,9 +35,11 @@ async def chat(
             conversation_id
         )
         
-        # Format conversation history
+        # Format conversation history - INCLUDE Product ID
         formatted_history = ''.join([
             f"{m['role'].capitalize()}: {m['content']}\n"
+            + (f"Products: {m.get('table', [])}\n" if m.get('table') else "")
+            + (f"Orders: {m.get('orders_table', [])}\n" if m.get('orders_table') else "")
             for m in conversation_history
         ])
         
@@ -85,7 +87,7 @@ async def chat(
                 logger.error(f"Error sending invoice email: {str(email_err)}")
                 chatbot_response += "\n There was an error sending the invoice email."
         
-        # Store bot response
+        # Store bot response with Product IDs
         conversation_history.append({
             "role": "bot",
             "content": chatbot_response,
@@ -185,9 +187,9 @@ async def chat_with_image(
             chatbot_response = f"I couldn't find any products similar to the image you uploaded. {message}"
             products = []
         else:
-            # Create hybrid prompt with image search results
+            # Create hybrid prompt with image search results - INCLUDE Product ID
             product_info = "\n".join([
-                f"🕶️ {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
+                f"🕶️ Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
                 f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, "
                 f"Face Shape: {p['Face Shape']} \n🌄 Image: {p['Image URL']}, "
                 f"frame color: {p['Frame Colour']}, lens color: {p['Lens Color']}"
@@ -204,12 +206,13 @@ async def chat_with_image(
                 If they're asking for modifications (like different color, shape, price range) to what they uploaded,
                 recommend the most appropriate products from the list above.
 
-                Return a JSON response in this exact format:
+                Return a JSON response in this exact format (MUST include Product ID):
 
                 {{
                 "chatbot_response": "Your helpful response here explaining your recommendations",
                 "products": [
                     {{
+                    "Product ID": "P001",
                     "Product Name": "Product 1",
                     "Price": 1000,
                     "Brand Name": "Brand A",
@@ -223,6 +226,7 @@ async def chat_with_image(
                     "Lens Color": "Gray"
                     }},
                     {{
+                    "Product ID": "P002",
                     "Product Name": "Product 2",
                     "Price": 1200,
                     "Brand Name": "Brand B",

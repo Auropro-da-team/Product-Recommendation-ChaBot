@@ -10,6 +10,20 @@ class ChatbotService:
         self.agent = agent
         self.search_service = search_service
     
+    def _extract_product_ids_from_history(self, conversation_history: str) -> List[str]:
+        """Extract Product IDs from conversation history."""
+        product_ids = []
+        try:
+            # Look for product recommendations in history
+            if "Product ID" in conversation_history:
+                import re
+                # Match patterns like "Product ID: P019" or "'Product ID': 'P019'"
+                matches = re.findall(r"['\"]?Product ID['\"]?\s*:\s*['\"]?(P\d+)['\"]?", conversation_history)
+                product_ids.extend(matches)
+        except Exception as e:
+            logger.error(f"Error extracting product IDs from history: {e}")
+        return list(set(product_ids))  # Remove duplicates
+    
     def process_message(
         self,
         user_input: str,
@@ -25,6 +39,10 @@ class ChatbotService:
         Returns:
             Tuple of (response, send_invoice_flag)
         """
+        
+        # Extract previously recommended Product IDs from conversation history
+        previously_recommended_product_ids = self._extract_product_ids_from_history(conversation_history)
+        
         prompt = f"""
 You are an Essilor chatbot, a company that provides expert advice on sunglasses and eyewear.
 Maintain a professional yet friendly tone. Personalize responses based on the user's needs. *Do not hallucinate*. Respond to the user in 3-4 lines.
@@ -34,6 +52,12 @@ You should be able to answer all kinds of questions about a product, including p
 You can also answer questions about orders, including order status, delivery date, and other order-related information.
 
 You need to extract the order id from user queries, the order id is of the form "o1001", "O1001" and product id is of the form "p001" or "P011"
+
+IMPORTANT: If the user asks questions like "Did I buy any of these?", "Have I ordered this before?", or similar queries about previously recommended products:
+- Previously recommended Product IDs: {previously_recommended_product_ids if previously_recommended_product_ids else "None"}
+- Set run_retrieval_orders=true to fetch the user's order history
+- You will compare the Product IDs from the orders with the previously recommended Product IDs
+- If there's a match, inform the user that they have purchased that specific product before
 
 If the user expresses that they want to get their invoice, follow these rules:
 - If the order ID *is present* in the conversation history, set send_invoice_email: true and run_retrieval_orders: true
@@ -54,6 +78,8 @@ For vague order queries like "my last order", "show my orders", "what did I orde
 
 When the user asks for an invoice AND their order ID is NOT in conversation history, you need to ask the user for their order ID and set send_invoice_email=false AND run_retrieval_orders=false
 
+When user asks "Did I buy any of these?" or similar questions about previously recommended products, ALWAYS set run_retrieval_orders=true (even without explicit Order ID).
+
 Before responding, make sure that the product or order the user is looking for is actually in the database when run_retrieval_products or run_retrieval_orders = true. *Do not hallucinate*.
 
 Return a JSON response in the *exact* format below:
@@ -65,8 +91,13 @@ Return a JSON response in the *exact* format below:
   "send_invoice_email": true or false
 }}
 
-If the user is asking about SPECIFIC products (like "sunglasses under 2000", "Ray-Ban aviators", "glasses for oval face", "glasses for grey suit", "top 3 glasses for X"), set "run_retrieval_products": true.
-For vague queries like "I need glasses" or "show me eyewear", set "run_retrieval_products": false and ask clarifying questions.
+CRITICAL RULES FOR run_retrieval_products:
+- If the user asks for SPECIFIC product recommendations with clear criteria (like "Recommend 4 glasses for trek", "sunglasses under 2000", "Ray-Ban aviators", "glasses for oval face", "top 3 glasses for X"), ALWAYS set "run_retrieval_products": true IMMEDIATELY. DO NOT ask clarifying questions.
+- The words "recommend", "show me", "find", "suggest" combined with specific use cases (trek, vacation, sports, beach, etc.) or numbers (top 3, 4 glasses, etc.) are SPECIFIC queries.
+- Only set "run_retrieval_products": false for extremely vague queries like "I need glasses" or "tell me about eyewear" WITHOUT any specific criteria.
+- If user says "yes" after you asked if they want recommendations, set "run_retrieval_products": true.
+
+For vague queries WITHOUT specific criteria, set "run_retrieval_products": false and ask ONE clarifying question.
 
 If the user is asking about orders (like order status, delivery date, specific order ID), set "run_retrieval_orders": true.
 
@@ -94,7 +125,7 @@ For general trivia questions NOT related to product recommendations (like "who i
             
             if retrieved_products and len(retrieved_products) > 0:
                 product_info = "\n".join([
-                    f"🕶 {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
+                    f"🕶 Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
                     f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, "
                     f"Face Shape: {p['Face Shape']} \n🌄 Image: {p['Image URL']}, "
                     f"lens prescription type: {p['Prescription Type']}, "
@@ -105,18 +136,19 @@ For general trivia questions NOT related to product recommendations (like "who i
                 retrieval_prompt = f"""
 You have the following conversation history: {conversation_history}. Using that, once you've retrieved the product {product_info}
 Based on {conversation_history} and {user_input}, give the best and most relevant responses from {product_info}.
- - Always give the complete info about the products, also their price.
+ - Always give the complete info about the products, including their Product ID, price, and other details.
 - You should give very human-like responses and need to be conversational.
 - When you recommend a product to a user, you need to logically explain why you're recommending the product in 1-2 lines.
 - Given this information, generate a conversational response summarizing the best product options for the user in 3-4 lines. *Do not hallucinate.*
 If a product does not exist in the database, tell the user that and then give a similar product recommendation.
 
-- Respond in JSON format with a list of products having the following structure:
+- Respond in JSON format with a list of products having the following structure (MUST include Product ID):
 
 {{
 "chatbot_response": "Ok, I have found a few products for you:",
 "products": [
     {{
+    "Product ID": "P001",
     "Product Name": "Product 1",
     "Price": 1000,
     "Brand Name": "Brand A",
@@ -141,26 +173,111 @@ If a product does not exist in the database, tell the user that and then give a 
             logger.info(f"Retrieved orders: {retrieved_orders}")
             
             if retrieved_orders:
-                order_info = "\n".join([
-                    f"📦 Order #{o['Order ID']} - Product: {o['Product Name']}, "
-                    f"Customer: {o['Customer Name']}, Email: {o['Email ID']}, "
-                    f"Ordered on: {o['Date of Order']}, Status: {o['Order Status']}, "
-                    f"Delivery date: {o['Date of Delivery']}, Quantity: {o['Quantity']}"
-                    for o in retrieved_orders
+                # Check if this is a comparison query (e.g., "Did I buy any of these?")
+                is_comparison_query = any(phrase in user_input.lower() for phrase in [
+                    "did i buy", "have i ordered", "purchased any", "bought any of these",
+                    "ordered any of these", "have i bought"
                 ])
-                logger.info(f"Order info: {order_info}")
                 
-                order_retrieval_prompt = f"""
+                if is_comparison_query and previously_recommended_product_ids:
+                    # Compare Product IDs
+                    ordered_product_ids = [order.get('Product ID') for order in retrieved_orders if order.get('Product ID')]
+                    matching_products = [pid for pid in previously_recommended_product_ids if pid in ordered_product_ids]
+                    
+                    logger.info(f"Previously recommended: {previously_recommended_product_ids}")
+                    logger.info(f"Ordered products: {ordered_product_ids}")
+                    logger.info(f"Matches found: {matching_products}")
+                    
+                    if matching_products:
+                        # Found matches - get full order details
+                        matched_orders = [order for order in retrieved_orders if order.get('Product ID') in matching_products]
+                        
+                        order_info = "\n".join([
+                            f"📦 Order #{o['Order ID']} - Product: {o['Product Name']} (Product ID: {o['Product ID']}), "
+                            f"Customer: {o['Customer Name']}, Email: {o['Email ID']}, "
+                            f"Ordered on: {o['Date of Order']}, Status: {o['Order Status']}, "
+                            f"Delivery date: {o['Date of Delivery']}, Quantity: {o['Quantity']}"
+                            for o in matched_orders
+                        ])
+                        
+                        comparison_prompt = f"""
+The user asked: "{user_input}"
+
+Previously recommended Product IDs: {previously_recommended_product_ids}
+User's orders with matching Product IDs: {matching_products}
+
+Here are the matching order details:
+{order_info}
+
+Generate a friendly, conversational response (3-4 lines) that:
+1. Confirms YES, they have purchased one or more of the recommended products
+2. Mentions which specific product(s) they bought (by name and Product ID)
+3. Provides key order details (order ID, status, delivery date)
+4. Shows enthusiasm and helpfulness
+
+Respond in JSON format:
+
+{{
+"chatbot_response": "Yes! I can see you've already purchased the Mid Gunmetal Full Rim Aviator (Product ID: P019) from our recommendations. Your order O1004 is currently shipped and will be delivered by 20/04/25. Great choice!",
+"orders": [
+    {{
+    "Order ID": "O1004",
+    "Email ID": "mudgala.chinni@auropro.com",
+    "Product Name": "Mid Gunmetal Full Rim Aviator",
+    "Product ID": "P019",
+    "Date of Order": "2025-04-15",
+    "Order Status": "Shipped",
+    "Date of Delivery": "2025-04-20",
+    "Quantity": "3",
+    "Customer ID": "C004",
+    "Customer Name": "Mudgala"
+    }}
+]
+}}
+"""
+                        response_json["chatbot_response"] = self.agent.run(comparison_prompt).content
+                    else:
+                        # No matches found
+                        no_match_prompt = f"""
+The user asked: "{user_input}"
+
+Previously recommended Product IDs: {previously_recommended_product_ids}
+User's order history Product IDs: {ordered_product_ids}
+
+No matches were found between recommended products and purchased products.
+
+Generate a friendly response (2-3 lines) informing them that they haven't purchased any of the recommended products yet, and perhaps encourage them to try one.
+
+Respond in JSON format:
+
+{{
+"chatbot_response": "No, you haven't purchased any of the products I recommended yet. However, based on your previous order, you might really enjoy the styles I suggested! Would you like to know more about any of them?",
+"orders": []
+}}
+"""
+                        response_json["chatbot_response"] = self.agent.run(no_match_prompt).content
+                else:
+                    # Regular order query (not a comparison)
+                    order_info = "\n".join([
+                        f"📦 Order #{o['Order ID']} - Product: {o['Product Name']} (Product ID: {o.get('Product ID', 'N/A')}), "
+                        f"Customer: {o['Customer Name']}, Email: {o['Email ID']}, "
+                        f"Ordered on: {o['Date of Order']}, Status: {o['Order Status']}, "
+                        f"Delivery date: {o['Date of Delivery']}, Quantity: {o['Quantity']}"
+                        for o in retrieved_orders
+                    ])
+                    logger.info(f"Order info: {order_info}")
+                    
+                    order_retrieval_prompt = f"""
 You have the following conversation history: {conversation_history}. Using that, once you've retrieved the order information: {order_info}
 Based on {conversation_history} and {user_input}, give the best and most relevant responses from {order_info}.
-- Always give complete info about the orders, including status and delivery date.
+- Always give complete info about the orders, including Product ID, status and delivery date.
 - You will have to extract the order id (e.g, O1001, o1001), customer id (e.g, c001, C001) and other important fields from the user input
 
 - You should give very human-like responses and need to be conversational.
 - Given this information, generate a conversational response summarizing the order information for the user in 3-4 lines. *Do not hallucinate.*
 If an order does not exist in the database, tell the user that politely.
 
-- Respond in JSON format with a list of orders having the following structure:
+- Respond in JSON format with a list of orders having the following structure (MUST include Product ID):
 
 {{
 "chatbot_response": "Here's the order information you requested:",
@@ -169,40 +286,29 @@ If an order does not exist in the database, tell the user that politely.
     "Order ID": "ORD12345",
     "Email ID": "customer@example.com",
     "Product Name": "Product 1",
+    "Product ID": "P001",
     "Date of Order": "2025-04-01",
     "Order Status": "Delivered",
     "Date of Delivery": "2025-04-10",
     "Quantity": "1",
     "Customer ID": "CUST123",
-    "Product ID": "PROD456",
     "Customer Name": "John Doe"
     }}
 ]
 }}
 """
-                
-                response_json["chatbot_response"] = self.agent.run(order_retrieval_prompt).content
-                logger.info(f"Order retrieval response: {response_json['chatbot_response']}")
-#             else:
-#                 # If no orders found but invoice was requested
-#                 if response_json.get("send_invoice_email", False):
-#                     invoice_error_prompt = """
-# Ask the user politely for their order ID.
-# Keep the response conversational and helpful in 3-4 lines.
-# """
-#                     response_json["chatbot_response"] = self.agent.run(invoice_error_prompt).content
-#                     response_json["send_invoice_email"] = False
-#                     logger.info("Order retrieval for invoice sending failed - no orders found")
+                    
+                    response_json["chatbot_response"] = self.agent.run(order_retrieval_prompt).content
+                    logger.info(f"Order retrieval response: {response_json['chatbot_response']}")
             else:
-                # If no orders found but invoice was requested
+                # No orders found
                 if response_json.get("send_invoice_email", False):
-                    # Keep the original chatbot response (it already asks for order ID)
                     response_json["send_invoice_email"] = False
                     logger.info("No orders found - keeping original response asking for order ID")
                 else:
-                    # For general order queries with no results - ask for order ID
                     response_json["chatbot_response"] = "I'd be happy to help you find your order details! Could you please provide your order ID (e.g., O1001) so I can look it up for you?"
                     logger.info("No orders found for vague query - asking for order ID")
+        
         chatbot_response = response_json.get(
             "chatbot_response",
             "I'm sorry, I couldn't understand your request. Can you please clarify?"

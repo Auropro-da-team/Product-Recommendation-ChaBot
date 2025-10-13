@@ -6,6 +6,7 @@ class ChatRequest(BaseModel):
     user_input: str = Field(..., min_length=1)
 
 class ProductResponse(BaseModel):
+    product_id: str = Field(alias="Product ID")
     product_name: str = Field(alias="Product Name")
     brand_name: str = Field(alias="Brand Name")
     price: float = Field(alias="Price")

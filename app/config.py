@@ -7,8 +7,8 @@ class Settings:
     # Email Configuration
     EMAIL_HOST = "smtp.gmail.com"
     EMAIL_PORT = 587
-    EMAIL_HOST_USER = "likithgannarapu19@gmail.com"
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "toqe owtg dqnn bgsz")
+    EMAIL_HOST_USER = "mail.test.auropro@gmail.com"
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "yplk urnk mlhk wogg")
     
     # Firestore Configuration
     FIRESTORE_PROJECT_ID = os.getenv("FIRESTORE_PROJECT_ID", "prj-auropro-dev")

@@ -23,17 +23,22 @@ class ChromaDBManager:
         """Populate products collection from DataFrame."""
         if self.products_collection.count() == 0:
             logger.info("Populating ChromaDB with product data...")
+            logger.info(f"CSV Columns: {df.columns.tolist()}")
+
             for i, row in df.iterrows():
                 description = format_description_v2(row)
                 embedding = self.model.encode(description, convert_to_numpy=True).tolist()
+                if i == 0:  # Log first product to verify
+                    logger.info(f"First product data: {row.to_dict()}")
                 self.products_collection.add(
                     ids=[str(i)],
                     embeddings=[embedding],
                     metadatas=[{
+                        "Product ID": row["Product ID"],
                         "Product Name": row["Product Name"],
                         "Brand Name": row["Brand Name"],
                         "Price": row["Price"],
-                        "Discount": row["Dicount"],
+                        "Discount": row["Discount"],
                         "Activity": row["Activity"],
                         "Face Shape": row["Face Shape"],
                         "Product Type": row["Product Type"],
@@ -84,4 +89,57 @@ class ChromaDBManager:
     def get_all_orders(self) -> Dict[str, Any]:
         """Get all orders from collection."""
         return self.orders_collection.get(include=["metadatas"])
-
+    
+    def get_product_by_id(self, product_id: str) -> Dict[str, Any]:
+        """Get a specific product by Product ID."""
+        all_products = self.products_collection.get(include=["metadatas"])
+        for metadata in all_products["metadatas"]:
+            if metadata.get("Product ID") == product_id:
+                return metadata
+        return None
+    
+    def populate_orders(self, df: pd.DataFrame) -> None:
+        """Populate orders collection from DataFrame."""
+        if self.orders_collection.count() == 0 and not df.empty:
+            logger.info("Populating ChromaDB with orders data...")
+            for i, row in df.iterrows():
+                description = format_order_description(row)
+                embedding = self.model.encode(description, convert_to_numpy=True).tolist()
+                self.orders_collection.add(
+                    ids=[str(i)],
+                    embeddings=[embedding],
+                    metadatas=[{
+                        "Order ID": str(row["Order ID"]),
+                        "Email ID": str(row["Email ID"]),
+                        "Product Name": str(row["Product Name"]),
+                        "Date of Order": str(row["Date of Order"]),
+                        "Order Status": str(row["Order Status"]),
+                        "Date of Delivery": str(row["Date of Delivery"]),
+                        "Quantity": str(row["Quantity"]),
+                        "Customer ID": str(row["Customer ID"]),
+                        "Product ID": str(row["Product ID"]),
+                        "Customer Name": str(row["Customer Name"])
+                    }]
+                )
+            logger.info(f"Total orders in collection: {self.orders_collection.count()}")
+        else:
+            logger.info(f"ChromaDB already contains {self.orders_collection.count()} orders")
+    
+    def query_products(self, query_embedding: List[float], top_k: int = 3) -> Dict[str, Any]:
+        """Query products collection."""
+        return self.products_collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k
+        )
+    
+    def get_all_orders(self) -> Dict[str, Any]:
+        """Get all orders from collection."""
+        return self.orders_collection.get(include=["metadatas"])
+    
+    def get_product_by_id(self, product_id: str) -> Dict[str, Any]:
+        """Get a specific product by Product ID."""
+        all_products = self.products_collection.get(include=["metadatas"])
+        for metadata in all_products["metadatas"]:
+            if metadata.get("Product ID") == product_id:
+                return metadata
+        return None
