@@ -63,13 +63,13 @@ You can also answer questions about orders, including order status, delivery dat
 
 You need to extract the order id from user queries, the order id is of the form "o1001", "O1001" and product id is of the form "p001" or "P011"
 
-IMPORTANT: If the user asks questions like "Did I buy any of these?", "Have I ordered this before?", or similar queries about previously recommended products:
+IMPORTANT: If the user asks questions like "Did I buy any of these?", "Have I ordered this before?", "Did I buy these earlier?", or similar queries about previously recommended products:
 - Previously recommended Product IDs: {previously_recommended_product_ids if previously_recommended_product_ids else "None"}
 - Order ID detected in conversation: {order_id_present if order_id_present else "None"}
-- ONLY set run_retrieval_orders=true if BOTH conditions are met:
-  1. Previously recommended Product IDs exist
-  2. You need to check if user ordered those specific products
-- If there's no Order ID in the conversation, set run_retrieval_orders=false and ask the user for their Order ID
+- If previously recommended Product IDs exist AND user asks about buying/ordering "these":
+  * If Order ID is present: Set run_retrieval_orders=true to compare products
+  * If Order ID is NOT present: Set run_retrieval_orders=false and ask for Order ID
+- This is a COMPARISON query - we need to check if they bought the RECOMMENDED products
 
 CRITICAL ORDER RETRIEVAL RULES (SECURITY):
 - run_retrieval_orders should ONLY be true when AT LEAST ONE of these identifiers is present:
@@ -199,16 +199,18 @@ If a product does not exist in the database, tell the user that and then give a 
                 # Check if this is a comparison query
                 is_comparison_query = any(phrase in user_input.lower() for phrase in [
                     "did i buy", "have i ordered", "purchased any", "bought any of these",
-                    "ordered any of these", "have i bought", "did i order"
+                    "ordered any of these", "have i bought", "did i order", "buy these"
                 ])
                 
-                # ALWAYS check for comparison if there are previously recommended products
-                if previously_recommended_product_ids and (is_comparison_query or "these" in user_input.lower() or "recommended" in user_input.lower()):
+                # ALWAYS check for comparison if there are previously recommended products AND it's a comparison-like query
+                if previously_recommended_product_ids and (is_comparison_query or "these" in user_input.lower()):
+                    logger.info(f"🔍 COMPARISON MODE ACTIVATED")
+                    logger.info(f"Previously recommended Product IDs: {previously_recommended_product_ids}")
+                    
                     # This is a comparison query - compare Product IDs
                     ordered_product_ids = [order.get('Product ID') for order in retrieved_orders if order.get('Product ID')]
                     matching_products = [pid for pid in previously_recommended_product_ids if pid in ordered_product_ids]
                     
-                    logger.info(f"Previously recommended: {previously_recommended_product_ids}")
                     logger.info(f"User's ordered products: {ordered_product_ids}")
                     logger.info(f"Matches found: {matching_products}")
                     
@@ -240,7 +242,7 @@ Generate a friendly, conversational response (3-4 lines) that:
 3. Provides key order details (Order ID, delivery status, and date)
 4. Keeps it natural and conversational
 
-Example: "Yes! You ordered the [Product Name] (Product ID: [PID]) that I recommended. Your order [Order ID] was delivered on [date]."
+Example: "Yes! You ordered the Light Green Full Rim Clubmaster (Product ID: P005) that I recommended. Your order O1021 is currently being processed."
 
 Respond in JSON format with the matching orders:
 
@@ -276,7 +278,7 @@ Generate a friendly, conversational response (3-4 lines) that:
 3. Provides their actual order details (Order ID and delivery status)
 4. Optionally asks if they'd like to learn more about the recommended products
 
-Example: "No, you haven't ordered the products I recommended (P012, P016). However, you did order [Product Name] (Product ID: [PID]). Your order [Order ID] was delivered on [date]. Would you like to know more about the products I recommended?"
+Example: "No, you haven't ordered the products I recommended (P012). However, you did order Light Green Full Rim Clubmaster (Product ID: P005). Your order O1021 is currently being processed. Would you like to know more about the Silver Full Rim Rectangle (P012) I recommended?"
 
 Respond in JSON format:
 
