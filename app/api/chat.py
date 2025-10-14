@@ -206,7 +206,7 @@ async def chat_with_image(
                 If they're asking for modifications (like different color, shape, price range) to what they uploaded,
                 recommend the most appropriate products from the list above.
 
-                Return a JSON response in this exact format (MUST include Product ID):
+                Return a JSON response in this exact format (MUST include Product ID only in the json response not with the user):
 
                 {{
                 "chatbot_response": "Your helpful response here explaining your recommendations",

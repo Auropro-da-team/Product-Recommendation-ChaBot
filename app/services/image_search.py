@@ -116,18 +116,18 @@ class ImageSearchService:
                     # Build result with safe metadata extraction
                     try:
                         result = {
-                            "Product ID": self._safe_get_metadata(meta, "Product ID", "N/A"),
-                            "Product Name": self._safe_get_metadata(meta, "Product Name", "Unknown Product"),
-                            "Brand Name": self._safe_get_metadata(meta, "Brand Name", "Unknown Brand"),
-                            "Price": float(self._safe_get_metadata(meta, "Price", 0)),
-                            "Discount": self._safe_get_metadata(meta, "Discount", 0),
-                            "Activity": self._safe_get_metadata(meta, "Activity", "General"),
-                            "Face Shape": self._safe_get_metadata(meta, "Face Shape", "All"),
-                            "Product Type": self._safe_get_metadata(meta, "Product Type", "Eyewear"),
+                            "Product ID": self._safe_get_metadata(meta, "Product ID"),
+                            "Product Name": self._safe_get_metadata(meta, "Product Name"),
+                            "Brand Name": self._safe_get_metadata(meta, "Brand Name"),
+                            "Price": float(self._safe_get_metadata(meta, "Price")),
+                            "Discount": self._safe_get_metadata(meta, "Discount"),
+                            "Activity": self._safe_get_metadata(meta, "Activity"),
+                            "Face Shape": self._safe_get_metadata(meta, "Face Shape"),
+                            "Product Type": self._safe_get_metadata(meta, "Product Type"),
                             "Image URL": image_url,
-                            "Prescription Type": self._safe_get_metadata(meta, "Prescription Type", "N/A"),
-                            "Frame Colour": self._safe_get_metadata(meta, "Frame Colour", "N/A"),
-                            "Lens Color": self._safe_get_metadata(meta, "Lens Color", "N/A"),
+                            "Prescription Type": self._safe_get_metadata(meta, "Prescription Type"),
+                            "Frame Colour": self._safe_get_metadata(meta, "Frame Colour"),
+                            "Lens Color": self._safe_get_metadata(meta, "Lens Color"),
                             "Similarity Score": float(sims[idx])
                         }
                         results.append(result)

@@ -35,7 +35,14 @@ class EmbeddingsManager:
                 blob.download_to_file(in_memory_file)
                 in_memory_file.seek(0)
                 
-                self.image_features_db = np.load(in_memory_file, allow_pickle=True)
+                # Load the npz file and convert to dictionary
+                npz_data = np.load(in_memory_file, allow_pickle=True)
+                self.image_features_db = {
+                    'embeddings': npz_data['embeddings'],
+                    'meta': npz_data['meta']
+                }
+                npz_data.close()  # Close the NpzFile object
+                
                 logger.info("Successfully loaded image embeddings from GCS")
                 return
         except Exception as e:
@@ -94,7 +101,13 @@ class EmbeddingsManager:
                     logger.info("Uploaded image embeddings to GCS")
                     
                     in_memory_file.seek(0)
-                    self.image_features_db = np.load(in_memory_file, allow_pickle=True)
+                    npz_data = np.load(in_memory_file, allow_pickle=True)
+                    self.image_features_db = {
+                        'embeddings': npz_data['embeddings'],
+                        'meta': npz_data['meta']
+                    }
+                    npz_data.close()
+                    
                     logger.info(f"Saved {len(meta_data)} image embeddings")
             except Exception as e:
                 logger.error(f"Failed to save or upload embeddings: {e}")
