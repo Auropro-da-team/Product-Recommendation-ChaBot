@@ -19,6 +19,17 @@ class ImageSearchService:
         self.device = device
         self.embeddings_manager = embeddings_manager
     
+    def _safe_get_metadata(self, meta: Dict[str, Any], key: str, default: Any = "N/A") -> Any:
+        """
+        Safely get metadata with fallback to default value.
+        Handles both direct keys and nested structures.
+        """
+        value = meta.get(key, default)
+        # Handle None values
+        if value is None:
+            return default
+        return value
+    
     def search_by_image(
         self,
         image_file: bytes,
@@ -82,30 +93,46 @@ class ImageSearchService:
                 if sims[idx] >= similarity_threshold:
                     meta = db_meta[idx]
                     
-                    # Use GCS URL if available
-                    image_url = meta.get("GCS_Image_URL", meta["Image URL"])
+                    # Use GCS URL if available, otherwise fallback to original
+                    image_url = self._safe_get_metadata(
+                        meta, 
+                        "GCS_Image_URL", 
+                        self._safe_get_metadata(meta, "Image URL", "")
+                    )
                     
-                    results.append({
-                        "Product Name": meta["Product Name"],
-                        "Brand Name": meta["Brand Name"],
-                        "Price": meta["Price"],
-                        "Discount": meta["Discount"],
-                        "Activity": meta["Activity"],
-                        "Face Shape": meta["Face Shape"],
-                        "Product Type": meta["Product Type"],
-                        "Image URL": image_url,
-                        "Prescription Type": meta["Prescription Type"],
-                        "Frame Colour": meta["Frame Colour"],
-                        "Lens Color": meta["Lens Color"],
-                        "Similarity Score": float(sims[idx])
-                    })
+                    # Build result with safe metadata extraction
+                    try:
+                        result = {
+                            "Product ID": self._safe_get_metadata(meta, "Product ID", "N/A"),
+                            "Product Name": self._safe_get_metadata(meta, "Product Name", "Unknown Product"),
+                            "Brand Name": self._safe_get_metadata(meta, "Brand Name", "Unknown Brand"),
+                            "Price": float(self._safe_get_metadata(meta, "Price", 0)),
+                            "Discount": self._safe_get_metadata(meta, "Discount", 0),
+                            "Activity": self._safe_get_metadata(meta, "Activity", "General"),
+                            "Face Shape": self._safe_get_metadata(meta, "Face Shape", "All"),
+                            "Product Type": self._safe_get_metadata(meta, "Product Type", "Eyewear"),
+                            "Image URL": image_url,
+                            "Prescription Type": self._safe_get_metadata(meta, "Prescription Type", "N/A"),
+                            "Frame Colour": self._safe_get_metadata(meta, "Frame Colour", "N/A"),
+                            "Lens Color": self._safe_get_metadata(meta, "Lens Color", "N/A"),
+                            "Similarity Score": float(sims[idx])
+                        }
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error building result for index {idx}: {e}")
+                        logger.error(f"Metadata: {meta}")
+                        continue
+                    
                 if len(results) == top_k:
                     break
             
             if not results:
+                logger.warning("No matching products found above similarity threshold")
                 return [], "No matching products found"
             
+            logger.info(f"Found {len(results)} similar products")
             return results, "Success"
+            
         except Exception as e:
             logger.exception(f"Error in image search: {e}")
             return [], f"Error processing image: {str(e)}"
