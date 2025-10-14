@@ -81,21 +81,8 @@ class ImageSearchService:
                 user_emb = self.clip_model.encode_image(img_tensor).cpu().numpy()
             
             # Compute similarities
-            if not isinstance(image_features_db, dict):
-                logger.error("Image features database is not in the expected format")
-                return [], "Database format error"
-            
-            db_embs = image_features_db.get('embeddings')
-            db_meta = image_features_db.get('meta')
-            
-            if db_embs is None or db_meta is None:
-                logger.error("Missing embeddings or metadata in database")
-                return [], "Database missing required data"
-            
-            # Convert meta to list if it's a numpy array
-            if isinstance(db_meta, np.ndarray):
-                db_meta = db_meta.tolist()
-            
+            db_embs = image_features_db['embeddings']
+            db_meta = image_features_db['meta'].tolist()
             sims = cosine_similarity(user_emb, db_embs)[0]
             
             # Get top matches
@@ -120,7 +107,7 @@ class ImageSearchService:
                             "Product Name": self._safe_get_metadata(meta, "Product Name"),
                             "Brand Name": self._safe_get_metadata(meta, "Brand Name"),
                             "Price": float(self._safe_get_metadata(meta, "Price")),
-                            "Discount": self._safe_get_metadata(meta, "Discount"),
+                            "Discount": float(self._safe_get_metadata(meta, "Discount")),
                             "Activity": self._safe_get_metadata(meta, "Activity"),
                             "Face Shape": self._safe_get_metadata(meta, "Face Shape"),
                             "Product Type": self._safe_get_metadata(meta, "Product Type"),
