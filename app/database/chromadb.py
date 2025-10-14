@@ -30,9 +30,35 @@ class ChromaDBManager:
         try:
             if pd.isna(value) or value is None:
                 return default
+            # Clean percentage signs if present
+            if isinstance(value, str):
+                value = value.strip().replace('%', '').replace(',', '')
             return float(value)
         except (ValueError, TypeError):
             return default
+    
+    def _clean_discount(self, value: Any) -> str:
+        """Clean discount value and return as percentage string."""
+        try:
+            if pd.isna(value) or value is None:
+                return "0%"
+            
+            # If it's already a string with %, extract and clean it
+            if isinstance(value, str) and '%' in value:
+                numeric = value.strip().replace('%', '').replace(',', '')
+                numeric_value = float(numeric)
+            else:
+                # If it's a number, use it directly
+                numeric_value = float(value)
+            
+            # Format based on whether it's a whole number or has decimals
+            if numeric_value == int(numeric_value):
+                return f"{int(numeric_value)}%"
+            else:
+                # Keep up to 2 decimal places, remove trailing zeros
+                return f"{numeric_value:.2f}%".rstrip('0').rstrip('.')
+        except (ValueError, TypeError):
+            return "0%"
     
     def populate_products(self, df: pd.DataFrame) -> None:
         """Populate products collection from DataFrame."""
@@ -62,7 +88,7 @@ class ChromaDBManager:
                         "Product Name": self._safe_str(row["Product Name"]),
                         "Brand Name": self._safe_str(row["Brand Name"]),
                         "Price": self._safe_float(row["Price"]),
-                        "Discount": self._safe_float(row["Discount"]),
+                        "Discount": self._clean_discount(row["Discount"]),  # FIXED: Use _clean_discount
                         "Activity": self._safe_str(row["Activity"]),
                         "Face Shape": self._safe_str(row["Face Shape"]),
                         "Product Type": self._safe_str(row["Product Type"]),
