@@ -11,15 +11,53 @@ class ChatbotService:
         self.search_service = search_service
     
     def _extract_product_ids_from_history(self, conversation_history: str) -> List[str]:
-        """Extract Product IDs from conversation history."""
+        """
+        Extract Product IDs from conversation history.
+        Improved to handle both string formats and list representations.
+        """
         product_ids = []
         try:
-            if "Product ID" in conversation_history:
-                import re
-                matches = re.findall(r"['\"]?Product ID['\"]?\s*:\s*['\"]?(P\d+)['\"]?", conversation_history)
-                product_ids.extend(matches)
+            import re
+            
+            # Pattern 1: Direct Product ID mentions (P001, P017, etc.)
+            direct_matches = re.findall(r'\bP\d{3,4}\b', conversation_history)
+            product_ids.extend(direct_matches)
+            
+            # Pattern 2: JSON-style "Product ID": "P001"
+            json_matches = re.findall(r'["\']?Product ID["\']?\s*:\s*["\']?(P\d{3,4})["\']?', conversation_history)
+            product_ids.extend(json_matches)
+            
+            # Pattern 3: Dictionary representation {'Product ID': 'P001'}
+            dict_matches = re.findall(r"'Product ID':\s*'(P\d{3,4})'", conversation_history)
+            product_ids.extend(dict_matches)
+            
+            logger.info(f"📋 Extracted Product IDs from history: {list(set(product_ids))}")
+            
         except Exception as e:
             logger.error(f"Error extracting product IDs from history: {e}")
+        
+        return list(set(product_ids))
+    
+    def _extract_product_ids_from_messages(self, conversation_history_list: List[Dict]) -> List[str]:
+        """
+        Extract Product IDs directly from conversation message objects (more reliable).
+        This should be used instead of parsing formatted strings.
+        """
+        product_ids = []
+        try:
+            for message in conversation_history_list:
+                # Check if this is a bot message with products
+                if message.get('role') == 'bot' and message.get('table'):
+                    products = message.get('table', [])
+                    for product in products:
+                        if isinstance(product, dict) and 'Product ID' in product:
+                            product_ids.append(product['Product ID'])
+            
+            logger.info(f"📋 Extracted Product IDs from message objects: {list(set(product_ids))}")
+            
+        except Exception as e:
+            logger.error(f"Error extracting product IDs from messages: {e}")
+        
         return list(set(product_ids))
     
     def _extract_order_id_from_input(self, user_input: str, conversation_history: str) -> str:
@@ -36,7 +74,8 @@ class ChatbotService:
         comparison_phrases = [
             "did i buy", "have i ordered", "purchased any", "bought any of these",
             "ordered any of these", "have i bought", "did i order", "buy these",
-            "ordered these", "purchase these", "bought these", "buy any of these"
+            "ordered these", "purchase these", "bought these", "buy any of these",
+            "did i purchase", "have i purchased"
         ]
         
         # Check current input
@@ -58,11 +97,17 @@ class ChatbotService:
     def process_message(
         self,
         user_input: str,
-        conversation_history: str
+        conversation_history: str,
+        conversation_history_list: List[Dict] = None  # NEW: Pass the actual list
     ) -> Tuple[Any, bool]:
         """Process user message and generate response."""
         
-        previously_recommended_product_ids = self._extract_product_ids_from_history(conversation_history)
+        # IMPROVED: Extract Product IDs from actual message objects if available
+        if conversation_history_list:
+            previously_recommended_product_ids = self._extract_product_ids_from_messages(conversation_history_list)
+        else:
+            previously_recommended_product_ids = self._extract_product_ids_from_history(conversation_history)
+        
         order_id_present = self._extract_order_id_from_input(user_input, conversation_history)
         
         # CRITICAL FIX: Check conversation history for comparison intent
@@ -200,11 +245,14 @@ Respond in JSON format:
                     logger.info(f"🔥 COMPARISON MODE ACTIVATED")
                     logger.info(f"Recommended Product IDs: {previously_recommended_product_ids}")
                     
+                    # Extract ordered Product IDs
                     ordered_product_ids = [order.get('Product ID') for order in retrieved_orders if order.get('Product ID')]
+                    
+                    # Find matches - ONLY compare recommended vs ordered
                     matching_products = [pid for pid in previously_recommended_product_ids if pid in ordered_product_ids]
                     
                     logger.info(f"User's ordered Product IDs: {ordered_product_ids}")
-                    logger.info(f"Matches found: {matching_products}")
+                    logger.info(f"🎯 Matches found (recommended AND ordered): {matching_products}")
                     
                     if matching_products:
                         # YES - user ordered some recommended products
@@ -218,45 +266,28 @@ Respond in JSON format:
                         ])
                         
                         comparison_prompt = f"""
-The user originally asked: "Did I order any of these earlier?" referring to products I recommended.
+The user originally asked: "Did I buy any of these before?"
+Then provided Order ID: {order_id_present}
 
-RECOMMENDED PRODUCTS (what I suggested): {previously_recommended_product_ids}
-ACTUAL ORDERED PRODUCTS (what they bought): {ordered_product_ids}
-
-RESULT: MATCH FOUND! Product IDs {matching_products} appear in BOTH lists.
+Previously recommended Product IDs: {previously_recommended_product_ids}
+User's order history shows Product IDs: {ordered_product_ids}
+MATCHES FOUND: {matching_products}
 
 Matching order details:
 {order_details}
 
 Generate a friendly, conversational response (3-4 lines) that:
-1. STARTS WITH "Yes!" or "Yes, you did!" to clearly confirm they DID order the recommended product(s)
-2. Be specific about which recommended product they ordered
-3. Provide Order ID, order status, delivery date, and quantity
-4. Sound natural and helpful
+1. STARTS WITH "Yes!" or "Yes, you did!" to clearly confirm they ordered recommended products
+2. Mentions the specific product name and Product ID they bought
+3. Provides Order ID, order status, and key dates
+4. Sounds natural and helpful
 
-Example: "Yes! You ordered the Gray Full Rim Round (Product ID: P040) that I recommended. Your order O1002 was placed on April 15th and delivered on April 19th. You ordered 2 units."
-
-CRITICAL RULES:
-- Only mention products that are in the MATCHING list: {matching_products}
-- Return ALL order fields including Order ID, Date of Order, Order Status, Date of Delivery, Quantity, Product Name, Customer Name, Email ID, Customer ID, and Product ID
+Example: "Yes! You ordered the Gray Full Rim Round (Product ID: P040) that I recommended. Your order O1002 was delivered on April 19th, 2025. You ordered 2 units."
 
 Respond in JSON:
 {{
-"chatbot_response": "Your friendly confirmation starting with YES",
-"orders": [
-    {{
-    "Order ID": "O1002",
-    "Date of Order": "2025-04-15",
-    "Order Status": "Delivered",
-    "Date of Delivery": "2025-04-19",
-    "Quantity": "2",
-    "Product Name": "Gray Full Rim Round",
-    "Customer Name": "John Doe",
-    "Email ID": "customer@example.com",
-    "Customer ID": "CUST123",
-    "Product ID": "P040"
-    }}
-]
+"chatbot_response": "Your friendly confirmation response starting with YES",
+"orders": [matching orders with all fields]
 }}
 """
                         response_json["chatbot_response"] = self.agent.run(comparison_prompt).content
@@ -269,47 +300,28 @@ Respond in JSON:
                         ])
                         
                         no_match_prompt = f"""
-The user originally asked: "Did I order any of these earlier?" referring to products I recommended.
+The user originally asked: "Did I buy any of these before?"
+Then provided Order ID: {order_id_present}
 
-RECOMMENDED PRODUCTS (what I suggested): {previously_recommended_product_ids}
-ACTUAL ORDERED PRODUCTS (what they bought): {ordered_product_ids}
+Previously recommended Product IDs: {previously_recommended_product_ids}
+User's actual order history shows Product IDs: {ordered_product_ids}
+NO MATCHES - they didn't order any recommended products
 
-RESULT: NO MATCH - The user did NOT order any of the products I recommended.
-
-Their actual order history (different products):
+Their actual order history:
 {all_order_details}
 
 Generate a friendly response (3-4 lines) that:
-1. STARTS WITH "No, you haven't ordered" to clearly state they didn't order the RECOMMENDED products
-2. Be specific: "You haven't ordered the Gray Full Rim Round (P040) or Black Full Rim Clubmaster (P025) that I recommended."
-3. Then mention what they ACTUALLY ordered: "However, you did order the Light Gunmetal Full Rim Aviator (Product ID: P017) which was delivered on April 25th."
-4. Optionally ask if they want more info about the recommended products
+1. STARTS WITH "No" or "No, you haven't" to clearly state they didn't order recommended products
+2. Mentions what they actually ordered (product name and Product ID)
+3. Provides their Order ID and order status
+4. Optionally offers more info about recommended products
 
-CRITICAL RULES:
-- Do NOT say they didn't order something if it's in their order history
-- Be clear about the distinction between RECOMMENDED products vs ACTUALLY ORDERED products
-- Return ALL order fields including Order ID, Date of Order, Order Status, Date of Delivery, Quantity, Product Name, Customer Name, Email ID, Customer ID, and Product ID
-
-Example response:
-"No, you haven't ordered the Gray Full Rim Round (P040) or Black Full Rim Clubmaster (P025) that I recommended. However, according to your order history, you previously ordered the Light Gunmetal Full Rim Aviator (Product ID: P017) on April 15th, which was delivered on April 25th. Would you like to know more about my recommended products?"
+Example: "No, you haven't ordered the Silver Full Rim Clubmaster (P044) or Gray Transparent Full Rim Aviator (P020) that I recommended. However, you did order the Gray Full Rim Round (Product ID: P040) which was delivered on April 19th. Would you like to know more about my other recommendations?"
 
 Respond in JSON:
 {{
-"chatbot_response": "Your clear, accurate response",
-"orders": [
-    {{
-    "Order ID": "O1001",
-    "Date of Order": "2025-04-15",
-    "Order Status": "Delivered",
-    "Date of Delivery": "2025-04-25",
-    "Quantity": "1",
-    "Product Name": "Light Gunmetal Full Rim Aviator",
-    "Customer Name": "John Doe",
-    "Email ID": "likith@example.com",
-    "Customer ID": "CUST001",
-    "Product ID": "P017"
-    }}
-]
+"chatbot_response": "Your friendly response starting with NO",
+"orders": [their actual orders for reference]
 }}
 """
                         response_json["chatbot_response"] = self.agent.run(no_match_prompt).content
@@ -334,23 +346,21 @@ Generate a conversational response (3-4 lines) summarizing order information.
 Include Product ID, Order ID, status, and delivery date.
 Be natural and helpful.
 
-CRITICAL: Return ALL order fields in the response including Order ID, Date of Order, Order Status, Date of Delivery, Quantity, Product Name, Customer Name, Email ID, Customer ID, and Product ID.
-
 Respond in JSON:
 {{
 "chatbot_response": "Here's your order information:",
 "orders": [
     {{
     "Order ID": "O1010",
+    "Email ID": "customer@example.com",
+    "Product Name": "Product 1",
+    "Product ID": "P001",
     "Date of Order": "2025-04-01",
     "Order Status": "Delivered",
     "Date of Delivery": "2025-04-10",
     "Quantity": "1",
-    "Product Name": "Product 1",
-    "Customer Name": "John Doe",
-    "Email ID": "customer@example.com",
     "Customer ID": "CUST123",
-    "Product ID": "P001"
+    "Customer Name": "John Doe"
     }}
 ]
 }}
