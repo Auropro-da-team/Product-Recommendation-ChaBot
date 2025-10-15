@@ -147,7 +147,7 @@ Return JSON:
             
             if retrieved_products and len(retrieved_products) > 0:
                 product_info = "\n".join([
-                    f"🕶 Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
+                    f"🕶 Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']}, "
                     f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, Face Shape: {p['Face Shape']}, "
                     f"Image: {p['Image URL']}, Prescription: {p['Prescription Type']}, "
                     f"Frame: {p['Frame Colour']}, Lens: {p['Lens Color']}"
