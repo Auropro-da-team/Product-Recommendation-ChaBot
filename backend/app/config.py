@@ -30,9 +30,9 @@ class Settings:
     ORDERS_COLLECTION_NAME = "B_237676564354"
     
     # Data Paths
-    PRODUCTS_CSV_PATH = "/Users/likithgannarapu/Documents/Auropro/Product-Recommendation-ChaBot/csv_files/Updated_Essilor_Products.csv"
-    ORDERS_CSV_PATH = "/Users/likithgannarapu/Documents/Auropro/Product-Recommendation-ChaBot/csv_files/order table.csv"
-    
+    PRODUCTS_CSV_PATH = "csv_files/Updated_Essilor_Products.csv"
+    ORDERS_CSV_PATH = "csv_files/order table.csv"
+
     # Search Configuration
     DEFAULT_TOP_K = 3
     IMAGE_SIMILARITY_THRESHOLD = 0.45

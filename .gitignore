@@ -1,9 +1,10 @@
+backend/.venv
 .venv
-.env
-service-account.json
+backend/.env
+backend/service-account.json
 */__pycache__
 __pycache__
-chroma_db/
-junk.txt
+backend/chroma_db/
+backend/junk.txt
 .DS_Store
-csv_files copy/
+backend/csv_files copy/
