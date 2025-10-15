@@ -11,53 +11,34 @@ class ChatbotService:
         self.search_service = search_service
     
     def _extract_product_ids_from_history(self, conversation_history: str) -> List[str]:
-        """
-        Extract Product IDs from conversation history.
-        Improved to handle both string formats and list representations.
-        """
+        """Extract Product IDs from conversation history."""
         product_ids = []
         try:
             import re
-            
-            # Pattern 1: Direct Product ID mentions (P001, P017, etc.)
             direct_matches = re.findall(r'\bP\d{3,4}\b', conversation_history)
             product_ids.extend(direct_matches)
-            
-            # Pattern 2: JSON-style "Product ID": "P001"
             json_matches = re.findall(r'["\']?Product ID["\']?\s*:\s*["\']?(P\d{3,4})["\']?', conversation_history)
             product_ids.extend(json_matches)
-            
-            # Pattern 3: Dictionary representation {'Product ID': 'P001'}
             dict_matches = re.findall(r"'Product ID':\s*'(P\d{3,4})'", conversation_history)
             product_ids.extend(dict_matches)
-            
             logger.info(f"📋 Extracted Product IDs from history: {list(set(product_ids))}")
-            
         except Exception as e:
             logger.error(f"Error extracting product IDs from history: {e}")
-        
         return list(set(product_ids))
     
     def _extract_product_ids_from_messages(self, conversation_history_list: List[Dict]) -> List[str]:
-        """
-        Extract Product IDs directly from conversation message objects (more reliable).
-        This should be used instead of parsing formatted strings.
-        """
+        """Extract Product IDs directly from conversation message objects."""
         product_ids = []
         try:
             for message in conversation_history_list:
-                # Check if this is a bot message with products
                 if message.get('role') == 'bot' and message.get('table'):
                     products = message.get('table', [])
                     for product in products:
                         if isinstance(product, dict) and 'Product ID' in product:
                             product_ids.append(product['Product ID'])
-            
             logger.info(f"📋 Extracted Product IDs from message objects: {list(set(product_ids))}")
-            
         except Exception as e:
             logger.error(f"Error extracting product IDs from messages: {e}")
-        
         return list(set(product_ids))
     
     def _extract_order_id_from_input(self, user_input: str, conversation_history: str) -> str:
@@ -67,10 +48,7 @@ class ChatbotService:
         return matches[0] if matches else None
     
     def _is_comparison_query_in_history(self, conversation_history: str, user_input: str) -> bool:
-        """
-        Check if THIS conversation has a comparison query.
-        Look at recent user messages (last 3-4 exchanges).
-        """
+        """Check if THIS conversation has a comparison query."""
         comparison_phrases = [
             "did i buy", "have i ordered", "purchased any", "bought any of these",
             "ordered any of these", "have i bought", "did i order", "buy these",
@@ -78,46 +56,57 @@ class ChatbotService:
             "did i purchase", "have i purchased"
         ]
         
-        # Check current input
         if any(phrase in user_input.lower() for phrase in comparison_phrases):
             return True
         
-        # Check last few user messages in history
         import re
         user_messages = re.findall(r'User:\s*([^\n]+)', conversation_history)
-        # Check last 3 user messages
         recent_messages = user_messages[-3:] if len(user_messages) >= 3 else user_messages
         
         for msg in recent_messages:
             if any(phrase in msg.lower() for phrase in comparison_phrases):
                 return True
-        
         return False
+    
+    def _ensure_complete_order_data(self, orders: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Ensure all order records have complete required fields.
+        Fill missing fields with 'N/A' to prevent null entries.
+        """
+        required_fields = [
+            'Order ID', 'Date of Order', 'Order Status', 'Date of Delivery',
+            'Quantity', 'Product Name', 'Customer Name', 'Email ID',
+            'Customer ID', 'Product ID'
+        ]
+        
+        complete_orders = []
+        for order in orders:
+            complete_order = {}
+            for field in required_fields:
+                complete_order[field] = order.get(field, 'N/A')
+            complete_orders.append(complete_order)
+        
+        return complete_orders
     
     def process_message(
         self,
         user_input: str,
         conversation_history: str,
-        conversation_history_list: List[Dict] = None  # NEW: Pass the actual list
+        conversation_history_list: List[Dict] = None
     ) -> Tuple[Any, bool]:
         """Process user message and generate response."""
         
-        # IMPROVED: Extract Product IDs from actual message objects if available
         if conversation_history_list:
             previously_recommended_product_ids = self._extract_product_ids_from_messages(conversation_history_list)
         else:
             previously_recommended_product_ids = self._extract_product_ids_from_history(conversation_history)
         
         order_id_present = self._extract_order_id_from_input(user_input, conversation_history)
-        
-        # CRITICAL FIX: Check conversation history for comparison intent
         is_comparison = self._is_comparison_query_in_history(conversation_history, user_input)
         
         logger.info(f"🔍 Comparison check: is_comparison={is_comparison}, recommended_products={previously_recommended_product_ids}, order_id={order_id_present}")
         
-        # If it's a comparison query but no Order ID yet, ask for it
         if is_comparison and previously_recommended_product_ids and not order_id_present:
-            # Check if user JUST asked the comparison question (not a follow-up)
             comparison_phrases = [
                 "did i buy", "have i ordered", "purchased any", "bought any of these",
                 "ordered any of these", "have i bought", "did i order", "buy these"
@@ -160,8 +149,8 @@ Conversation History:
 User: {user_input}
 
 PRODUCT RETRIEVAL RULES:
-- For SPECIFIC requests ("Recommend 4 glasses for trek", "sunglasses under 2000"): Set run_retrieval_products=true IMMEDIATELY
-- For vague queries without criteria: Set false and ask clarifying questions
+- For SPECIFIC requests: Set run_retrieval_products=true IMMEDIATELY
+- For vague queries: Set false and ask clarifying questions
 
 Return JSON:
 
@@ -178,7 +167,6 @@ Return JSON:
         response_json = clean_and_parse_json(raw_response)
         logger.info(f"Parsed response: {response_json}")
         
-        # Ensure invoice requires order retrieval
         if response_json.get("send_invoice_email", False) and not response_json.get("run_retrieval_orders", False):
             response_json["run_retrieval_orders"] = True
             logger.info("Setting run_retrieval_orders to True because send_invoice_email is True")
@@ -207,27 +195,7 @@ Retrieved products: {product_info}
 Generate a conversational response (3-4 lines) recommending the best products with logical explanations.
 Always include complete info: Product ID, price, discount, and why it's suitable.
 
-Respond in JSON format:
-
-{{
-"chatbot_response": "Ok, I have found a few products for you:",
-"products": [
-    {{
-    "Product ID": "P001",
-    "Product Name": "Product 1",
-    "Price": 1000,
-    "Brand Name": "Brand A",
-    "Discount": "10%",
-    "Activity": "Outdoor",
-    "Face Shape": "Round",
-    "Product Type": "Sunglasses",
-    "Image URL": "http://example.com/image1.jpg",
-    "Prescription Type": "Single Vision",
-    "Frame Colour": "Black",
-    "Lens Color": "Gray"
-    }}
-]
-}}
+Respond in JSON format with products array.
 """
                 
                 response_json["chatbot_response"] = self.agent.run(retrieval_prompt).content
@@ -237,18 +205,18 @@ Respond in JSON format:
             retrieved_orders = self.search_service.search_orders(conversation_history, user_input)
             logger.info(f"Retrieved orders count: {len(retrieved_orders)}")
             
+            # CRITICAL FIX: Ensure complete order data
+            retrieved_orders = self._ensure_complete_order_data(retrieved_orders)
+            logger.info(f"✅ Orders after ensuring complete data: {retrieved_orders}")
+            
             if retrieved_orders:
-                # CRITICAL FIX: Check if comparison based on conversation history
                 logger.info(f"🔍 DECISION POINT: is_comparison={is_comparison}, has_recommended_products={bool(previously_recommended_product_ids)}")
                 
                 if is_comparison and previously_recommended_product_ids:
                     logger.info(f"🔥 COMPARISON MODE ACTIVATED")
                     logger.info(f"Recommended Product IDs: {previously_recommended_product_ids}")
                     
-                    # Extract ordered Product IDs
-                    ordered_product_ids = [order.get('Product ID') for order in retrieved_orders if order.get('Product ID')]
-                    
-                    # Find matches - ONLY compare recommended vs ordered
+                    ordered_product_ids = [order.get('Product ID') for order in retrieved_orders if order.get('Product ID') and order.get('Product ID') != 'N/A']
                     matching_products = [pid for pid in previously_recommended_product_ids if pid in ordered_product_ids]
                     
                     logger.info(f"User's ordered Product IDs: {ordered_product_ids}")
@@ -266,7 +234,7 @@ Respond in JSON format:
                         ])
                         
                         comparison_prompt = f"""
-The user originally asked: "Did I buy any of these before?"
+The user asked: "Did I buy any of these before?"
 Then provided Order ID: {order_id_present}
 
 Previously recommended Product IDs: {previously_recommended_product_ids}
@@ -276,38 +244,61 @@ MATCHES FOUND: {matching_products}
 Matching order details:
 {order_details}
 
-Generate a friendly, conversational response (3-4 lines) that:
-1. STARTS WITH "Yes!" or "Yes, you did!" to clearly confirm they ordered recommended products
-2. Mentions the specific product name and Product ID they bought
-3. Provides Order ID, order status, and key dates
-4. Sounds natural and helpful
+Generate a friendly response (3-4 lines) that:
+1. STARTS WITH "Yes!" to confirm they ordered recommended products
+2. Mentions product name and Product ID
+3. Provides Order ID, status, and dates
+4. Sounds natural
 
-Example: "Yes! You ordered the Gray Full Rim Round (Product ID: P040) that I recommended. Your order O1002 was delivered on April 19th, 2025. You ordered 2 units."
-
-Respond in JSON:
+Respond in JSON with complete order details:
 {{
-"chatbot_response": "Your friendly confirmation response starting with YES",
-"orders": [matching orders with all fields]
+"chatbot_response": "Your YES response",
+"orders": [
+    {{
+    "Order ID": "O1001",
+    "Date of Order": "15/04/25",
+    "Order Status": "Delivered",
+    "Date of Delivery": "20/04/25",
+    "Quantity": "1",
+    "Product Name": "Product Name",
+    "Customer Name": "Customer Name",
+    "Email ID": "email@example.com",
+    "Product ID": "P001",
+    "Customer ID": "C001"
+    }}
+]
 }}
+
+CRITICAL: Include ALL order fields in the response, not just chatbot_response.
 """
-                        response_json["chatbot_response"] = self.agent.run(comparison_prompt).content
+                        comparison_result = self.agent.run(comparison_prompt).content
+                        parsed_result = clean_chatbot_response(comparison_result)
+                        
+                        if isinstance(parsed_result, dict):
+                            response_json["chatbot_response"] = parsed_result.get("chatbot_response", "Yes! You ordered some of the recommended products.")
+                            # Use matched_orders to ensure we have complete data
+                            response_json["orders"] = parsed_result.get("orders", matched_orders)
+                        else:
+                            response_json["chatbot_response"] = comparison_result
+                            response_json["orders"] = matched_orders
                     else:
                         # NO - user did NOT order recommended products
                         all_order_details = "\n".join([
                             f"- {o['Product Name']} (Product ID: {o['Product ID']})\n"
-                            f"  Order #{o['Order ID']}, Status: {o['Order Status']}, Date: {o['Date of Order']}"
+                            f"  Order #{o['Order ID']}, Status: {o['Order Status']}, "
+                            f"Ordered: {o['Date of Order']}, Delivered: {o['Date of Delivery']}"
                             for o in retrieved_orders[:3]
                         ])
                         
                         no_match_prompt = f"""
-The user originally asked: "Did I buy any of these before?"
+The user asked: "Did I buy any of these before?"
 Then provided Order ID: {order_id_present}
 
 Previously recommended Product IDs: {previously_recommended_product_ids}
-User's actual order history shows Product IDs: {ordered_product_ids}
+User's actual order history Product IDs: {ordered_product_ids}
 NO MATCHES - they didn't order any recommended products
 
-Their actual order history:
+Their actual orders:
 {all_order_details}
 
 Generate a friendly response (3-4 lines) that:
@@ -316,9 +307,10 @@ Generate a friendly response (3-4 lines) that:
 3. Provides their Order ID and order status
 4. Optionally offers more info about recommended products
 
-Example: "No, you haven't ordered the Silver Full Rim Clubmaster (P044) or Gray Transparent Full Rim Aviator (P020) that I recommended. However, you did order the Gray Full Rim Round (Product ID: P040) which was delivered on April 19th. Would you like to know more about my other recommendations?"
+Example: "No, you haven't ordered the Silver Full Rim Clubmaster or Gray Transparent Full Rim Aviator that I recommended. However, you did order the Gray Full Rim Round which was delivered on April 19th. Would you like to know more about my other recommendations?"
 
-Respond in JSON:
+
+Respond in JSON with complete order details:
 {{
 "chatbot_response": "Your friendly response starting with NO",
 "orders": [their actual orders for reference]
@@ -343,34 +335,26 @@ User query: {user_input}
 Retrieved orders: {order_info}
 
 Generate a conversational response (3-4 lines) summarizing order information.
-Include Product ID, Order ID, status, and delivery date.
-Be natural and helpful.
 
-Respond in JSON:
+Respond in JSON with ALL order fields:
 {{
-"chatbot_response": "Here's your order information:",
-"orders": [
-    {{
-    "Order ID": "O1010",
-    "Email ID": "customer@example.com",
-    "Product Name": "Product 1",
-    "Product ID": "P001",
-    "Date of Order": "2025-04-01",
-    "Order Status": "Delivered",
-    "Date of Delivery": "2025-04-10",
-    "Quantity": "1",
-    "Customer ID": "CUST123",
-    "Customer Name": "John Doe"
-    }}
-]
+"chatbot_response": "Your response",
+"orders": [complete order objects with all fields]
 }}
 """
                     
-                    response_json["chatbot_response"] = self.agent.run(order_retrieval_prompt).content
-                    logger.info(f"Order retrieval response: {response_json['chatbot_response']}")
+                    order_result = self.agent.run(order_retrieval_prompt).content
+                    parsed_result = clean_chatbot_response(order_result)
+                    
+                    if isinstance(parsed_result, dict):
+                        response_json["chatbot_response"] = parsed_result.get("chatbot_response", "Here's your order information:")
+                        response_json["orders"] = parsed_result.get("orders", retrieved_orders)
+                    else:
+                        response_json["chatbot_response"] = order_result
+                        response_json["orders"] = retrieved_orders
             else:
                 # No orders found
-                logger.warning("No orders found - likely incorrect Order ID or missing identifier")
+                logger.warning("No orders found")
                 
                 import re
                 order_id_match = re.search(r'\b[Oo]\d{4,}\b', user_input + " " + conversation_history)
@@ -380,40 +364,61 @@ Respond in JSON:
                     if provided_order_id:
                         response_json["chatbot_response"] = f"I couldn't find any orders with Order ID {provided_order_id}. Please double-check your Order ID (format: O1001)."
                     else:
-                        response_json["chatbot_response"] = "To check if you've ordered these products, please provide your Order ID, email, or full name for security."
+                        response_json["chatbot_response"] = "To check if you've ordered these products, please provide your Order ID, email, or full name."
                 elif response_json.get("send_invoice_email", False):
                     response_json["send_invoice_email"] = False
                     if provided_order_id:
-                        response_json["chatbot_response"] = f"I couldn't find any orders with Order ID {provided_order_id}. Please verify your Order ID (format: O1001)."
+                        response_json["chatbot_response"] = f"I couldn't find any orders with Order ID {provided_order_id}. Please verify your Order ID."
                     else:
-                        response_json["chatbot_response"] = "To send your invoice, I need your Order ID (e.g., O1001). Could you provide it?"
+                        response_json["chatbot_response"] = "To send your invoice, I need your Order ID (e.g., O1001)."
                 else:
                     if provided_order_id:
-                        response_json["chatbot_response"] = f"I couldn't find any orders with Order ID {provided_order_id}. Please check if the Order ID is correct (format: O1001)."
+                        response_json["chatbot_response"] = f"I couldn't find any orders with Order ID {provided_order_id}. Please check if the Order ID is correct."
                     else:
-                        response_json["chatbot_response"] = "I'd be happy to help with your order! Please provide your Order ID (e.g., O1001), email, or full name for security."
+                        response_json["chatbot_response"] = "Please provide your Order ID, email, or full name to look up your order."
         
         chatbot_response = response_json.get(
             "chatbot_response",
-            "I'm sorry, I couldn't understand your request. Can you please clarify?"
+            "I'm sorry, I couldn't understand your request."
         )
         
         # Clean response
         if response_json.get("run_retrieval_products", False) or response_json.get("run_retrieval_orders", False):
             cleaned_response = clean_chatbot_response(chatbot_response)
+            
+            # CRITICAL: Ensure cleaned_response is always a dict structure
+            if not isinstance(cleaned_response, dict):
+                cleaned_response = {
+                    "chatbot_response": str(cleaned_response),
+                    "products": retrieved_products,
+                    "orders": retrieved_orders
+                }
+            else:
+                # Ensure products and orders are in the response
+                if "products" not in cleaned_response:
+                    cleaned_response["products"] = retrieved_products
+                if "orders" not in cleaned_response:
+                    cleaned_response["orders"] = retrieved_orders
         else:
-            cleaned_response = chatbot_response
+            cleaned_response = {
+                "chatbot_response": chatbot_response,
+                "products": [],
+                "orders": []
+            }
         
         # Log results
-        if isinstance(cleaned_response, dict) and "products" in cleaned_response:
-            logger.info(cleaned_response["chatbot_response"])
-            logger.info(format_product_table(cleaned_response["products"]))
+        if isinstance(cleaned_response, dict):
+            if "products" in cleaned_response:
+                logger.info(cleaned_response.get("chatbot_response", "Response generated"))
+                logger.info(format_product_table(cleaned_response["products"]))
+            
+            if "orders" in cleaned_response:
+                logger.info(cleaned_response.get("chatbot_response", "Response generated"))
+                logger.info(format_order_table(cleaned_response["orders"]))
+        else:
+            # If cleaned_response is a string, log it directly
+            logger.info(f"Response: {cleaned_response}")
         
-        if isinstance(cleaned_response, dict) and "orders" in cleaned_response:
-            logger.info(cleaned_response["chatbot_response"])
-            logger.info(format_order_table(cleaned_response["orders"]))
-        
-        # Only send invoice if we have order data
         send_invoice = response_json.get("send_invoice_email", False) and len(retrieved_orders) > 0
         
         return cleaned_response, send_invoice

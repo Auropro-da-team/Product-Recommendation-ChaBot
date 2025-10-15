@@ -57,24 +57,23 @@ async def chat(
             conversation_history  # Pass the actual list
         )
         
-        # Handle response
-        if isinstance(response, str):
+        # CRITICAL FIX: Handle response properly - it's already processed by chatbot service
+        if isinstance(response, dict):
+            # Response is already a structured dict from chatbot service
+            chatbot_response = response.get(
+                "chatbot_response",
+                "I'm sorry, I couldn't understand your request."
+            )
+            products = response.get("products", [])
+            orders = response.get("orders", [])
+        elif isinstance(response, str):
+            # Response is a plain string
             chatbot_response = response
             products = []
             orders = []
-        elif isinstance(response, dict):
-            if "error" in response:
-                chatbot_response = "I'm sorry, I couldn't process your request properly. Please try again."
-                products = []
-                orders = []
-            else:
-                chatbot_response = response.get(
-                    "chatbot_response",
-                    "I'm sorry, I couldn't understand your request."
-                )
-                products = response.get("products", [])
-                orders = response.get("orders", [])
         else:
+            # Unexpected response type
+            logger.error(f"Unexpected response type: {type(response)}")
             chatbot_response = "I'm sorry, I couldn't process your request properly. Please try again."
             products = []
             orders = []
@@ -189,9 +188,8 @@ async def chat_with_image(
             products = []
         else:
             # Create hybrid prompt with image search results
-            # CRITICAL: Include actual discount values from search results
             product_info = "\n".join([
-                f"🕶️ Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']}, "
+                f"🕶️ Product ID: {p.get('Product ID')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']}, "
                 f"Discount: {p['Discount']}, Suitable for: {p['Activity']}, "
                 f"Face Shape: {p['Face Shape']} \n🌄 Image: {p['Image URL']}, "
                 f"frame color: {p['Frame Colour']}, lens color: {p['Lens Color']}"
