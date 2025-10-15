@@ -53,7 +53,8 @@ async def chat(
         # Generate AI response
         response, send_invoice = deps.chatbot_service.process_message(
             user_input,
-            formatted_history
+            formatted_history,
+            conversation_history  # Pass the actual list
         )
         
         # Handle response
@@ -187,61 +188,57 @@ async def chat_with_image(
             chatbot_response = f"I couldn't find any products similar to the image you uploaded. {message}"
             products = []
         else:
-            # Create hybrid prompt with image search results - INCLUDE Product ID
+            # Create hybrid prompt with image search results
+            # CRITICAL: Include actual discount values from search results
             product_info = "\n".join([
                 f"🕶️ Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']}, "
-                f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, "
+                f"Discount: {p['Discount']}, Suitable for: {p['Activity']}, "
                 f"Face Shape: {p['Face Shape']} \n🌄 Image: {p['Image URL']}, "
                 f"frame color: {p['Frame Colour']}, lens color: {p['Lens Color']}"
                 for p in initial_results[:3]
             ])
             
             hybrid_prompt = f"""
-                The user uploaded an image of glasses and also provided this message: "{user_input}"
+The user uploaded an image of glasses and also provided this message: "{user_input}"
 
-                Here are the products most visually similar to their image:
-                {product_info}
+Here are the products most visually similar to their image:
+{product_info}
 
-                Please analyze both the image search results and their text query to provide a helpful response.
-                If they're asking for modifications (like different color, shape, price range) to what they uploaded,
-                recommend the most appropriate products from the list above.
+Please analyze both the image search results and their text query to provide a helpful response.
+If they're asking for modifications (like different color, shape, price range) to what they uploaded,
+recommend the most appropriate products from the list above.
 
-                Return a JSON response in this exact format (MUST include Product ID only in the json response not with the user):
+CRITICAL: When returning products, you MUST preserve the EXACT discount values from the search results above.
+DO NOT change or recalculate discount values. Use them exactly as provided.
 
-                {{
-                "chatbot_response": "Your helpful response here explaining your recommendations",
-                "products": [
-                    {{
-                    "Product ID": "P001",
-                    "Product Name": "Product 1",
-                    "Price": 1000,
-                    "Brand Name": "Brand A",
-                    "Discount": "10",
-                    "Activity": "Outdoor",
-                    "Face Shape": "Round",
-                    "Product Type": "Sunglasses",
-                    "Image URL": "http://example.com/image1.jpg",
-                    "Prescription Type": "Single Vision",
-                    "Frame Colour": "Black",
-                    "Lens Color": "Gray"
-                    }},
-                    {{
-                    "Product ID": "P002",
-                    "Product Name": "Product 2",
-                    "Price": 1200,
-                    "Brand Name": "Brand B",
-                    "Discount": "15",
-                    "Activity": "Sports",
-                    "Face Shape": "Oval",
-                    "Product Type": "Eyeglasses",
-                    "Image URL": "http://example.com/image2.jpg",
-                    "Prescription Type": "Progressive",
-                    "Frame Colour": "Blue",
-                    "Lens Color": "Brown"
-                    }}
-                ]
-                }}
-                """
+Return a JSON response in this exact format:
+
+{{
+  "chatbot_response": "Your helpful response here explaining your recommendations",
+  "products": [
+    {{
+      "Product ID": "P001",
+      "Product Name": "Product 1",
+      "Price": 1000,
+      "Brand Name": "Brand A",
+      "Discount": "10.50%",
+      "Activity": "Outdoor",
+      "Face Shape": "Round",
+      "Product Type": "Sunglasses",
+      "Image URL": "http://example.com/image1.jpg",
+      "Prescription Type": "Single Vision",
+      "Frame Colour": "Black",
+      "Lens Color": "Gray"
+    }}
+  ]
+}}
+
+IMPORTANT: 
+1. Copy the discount values EXACTLY as shown in the search results above
+2. Keep all other product details exactly as provided
+3. Only recommend products from the list above
+4. Do not invent or modify any product information
+"""
                             
             try:
                 # Get AI response for hybrid search
@@ -253,7 +250,30 @@ async def chat_with_image(
                         "chatbot_response",
                         "I found some products similar to your image."
                     )
-                    products = cleaned_response.get("products", initial_results[:3])
+                    
+                    # CRITICAL FIX: Merge AI response with original search results to preserve discount
+                    ai_products = cleaned_response.get("products", [])
+                    
+                    # Create a mapping of Product ID to original product data
+                    original_products_map = {p.get('Product ID'): p for p in initial_results[:3]}
+                    
+                    # Merge: use AI-selected products but preserve original discount values
+                    final_products = []
+                    for ai_prod in ai_products:
+                        prod_id = ai_prod.get('Product ID')
+                        if prod_id in original_products_map:
+                            # Use original product data to ensure discount is correct
+                            original = original_products_map[prod_id]
+                            # Keep AI's response but override with original discount
+                            merged_product = {**ai_prod, 'Discount': original['Discount']}
+                            final_products.append(merged_product)
+                        else:
+                            # Fallback: use AI product as-is
+                            final_products.append(ai_prod)
+                    
+                    products = final_products if final_products else initial_results[:3]
+                    
+                    logger.info(f"✅ Final products after discount preservation: {products}")
                 else:
                     chatbot_response = "I found some glasses similar to your image, but I'm not sure if they match your other requirements."
                     products = initial_results[:3]

@@ -31,15 +31,33 @@ class ImageSearchService:
         return value
     
     def _format_discount(self, discount_value: Any) -> str:
-        """Format discount as percentage string for display."""
+        """
+        Format discount as percentage string for display.
+        Handles values that already have % sign.
+        """
         try:
-            discount_float = float(discount_value)
-            # Format based on whether it's a whole number or has decimals
+            # Handle None or NaN
+            if discount_value is None or (isinstance(discount_value, float) and np.isnan(discount_value)):
+                return "0%"
+            
+            # If already a string with %, just return it as-is
+            if isinstance(discount_value, str):
+                if '%' in discount_value:
+                    return discount_value.strip()
+                else:
+                    # String without %, convert to float and format
+                    discount_float = float(discount_value)
+            else:
+                # Numeric value
+                discount_float = float(discount_value)
+            
+            # Format numeric values
             if discount_float == int(discount_float):
                 return f"{int(discount_float)}%"
             else:
                 # Keep up to 2 decimal places, remove trailing zeros
-                return f"{discount_float:.2f}%".rstrip('0').rstrip('.')
+                formatted = f"{discount_float:.2f}".rstrip('0').rstrip('.')
+                return f"{formatted}%"
         except (ValueError, TypeError):
             return "0%"
     
@@ -115,14 +133,15 @@ class ImageSearchService:
                     
                     # Build result with safe metadata extraction
                     try:
-                        # Get discount as float and format it for display
-                        discount_value = self._safe_get_metadata(meta, "Discount")
+                        # Get discount - it's already formatted in embeddings
+                        discount_value = self._safe_get_metadata(meta, "Discount", "0%")
+                        
                         result = {
                             "Product ID": self._safe_get_metadata(meta, "Product ID"),
                             "Product Name": self._safe_get_metadata(meta, "Product Name"),
                             "Brand Name": self._safe_get_metadata(meta, "Brand Name"),
                             "Price": float(self._safe_get_metadata(meta, "Price")),
-                            "Discount": self._format_discount(discount_value),
+                            "Discount": discount_value,  # Use as-is from embeddings
                             "Activity": self._safe_get_metadata(meta, "Activity"),
                             "Face Shape": self._safe_get_metadata(meta, "Face Shape"),
                             "Product Type": self._safe_get_metadata(meta, "Product Type"),
