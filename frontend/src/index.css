@@ -1,0 +1,175 @@
+/* Tailwind CSS Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Animations */
+@keyframes messageFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes botIdle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(15deg);
+  }
+}
+
+/* Add animation to utilities */
+@layer utilities {
+  .animate-messageFadeIn {
+    animation: messageFadeIn 0.5s ease-out;
+  }
+
+  .animate-botIdle {
+    animation: botIdle 1.5s infinite;
+  }
+}
+
+/* Base Layer */
+@layer base {
+  :root {
+    --AvenirLight: "__AvenirLight_179f9f", "__AvenirLight_Fallback_179f9f";
+    --AvenirMedium: "__AvenirMedium_53533b", "__AvenirMedium_Fallback_53533b";
+    --AvenirRoman: "__AvenirRoman_540bf0", "__AvenirRoman_Fallback_540bf0";
+    --AvenirBlack: "__AvenirBlack_24f5ad", "__AvenirBlack_Fallback_24f5ad";
+    --AvenirBold: "__AvenirBold_8f2e93", "__AvenirBold_Fallback_8f2e93";
+    --AvenirRegular: "__AvenirRegular_5c979d", "__AvenirRegular_Fallback_5c979d";
+  }
+
+  body, html, #root {
+    @apply text-main-text h-full;
+    font-family: var(--AvenirRegular), sans-serif;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  ::-webkit-scrollbar {
+    @apply h-4 w-2;
+  }
+
+  ::-webkit-scrollbar:horizontal {
+    @apply h-4 w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent rounded;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary-blue/50 border border-white rounded;
+  }
+}
+
+/* Components Layer */
+@layer components {
+  /* Chatbot Container */
+  .chat-container {
+    @apply flex h-full;
+    overflow:hidden;
+    
+  }
+
+  /* Left Sidebar for Chat History */
+  .chat-history-container {
+    @apply w-64 bg-gray-100 shadow-md p-4 h-full;
+  }
+
+  /* Chat History Styling */
+  .chat-history-list {
+    @apply space-y-2;
+  }
+
+  /* Main Chat Section */
+  .chat-main-container {
+    @apply flex-grow flex flex-col gap-6 pt-6 p-6;
+    position: relative;
+    z-index: 50;
+  }
+
+  /* Welcome Message */
+  .chat-welcome {
+    @apply text-center text-lg text-primary-blue font-light space-y-2;
+  }
+
+  /* Chat Input & Messages */
+  .chat-input {
+    @apply w-4/5 max-w-xl;
+  }
+
+  .chat-messages {
+    @apply w-4/5 max-w-xl;
+  }
+
+  /* Spinner */
+  .spinner-child {
+    @apply absolute -top-1 left-0 h-full w-full content-[''] rounded-full bg-primary-orange opacity-0;
+  }
+
+  /* Markdown Styles */
+  .markdown-container p {
+    @apply mb-5;
+  }
+
+  .markdown-container h1, h2, h3, h4, h5, h6 {
+    @apply font-bold mb-5;
+  }
+
+  .markdown-container li {
+    @apply mb-3;
+  }
+
+  .markdown-container li:last-child {
+    @apply mb-0;
+  }
+
+  .markdown-container ol {
+    @apply list-decimal mx-0 mt-0 mb-5 pl-8;
+  }
+
+  .markdown-container ul {
+    @apply list-disc mx-0 mt-0 mb-5 pl-8;
+  }
+
+  .markdown-container > :last-child {
+    @apply mb-0;
+  }
+}
+
+/* Font Utility Classes */
+@layer utilities {
+  .font-avenir-light {
+    font-family: var(--AvenirLight), sans-serif;
+  }
+
+  .font-avenir-medium {
+    font-family: var(--AvenirMedium), sans-serif;
+  }
+
+  .font-avenir-roman {
+    font-family: var(--AvenirRoman), sans-serif;
+  }
+
+  .font-avenir-black {
+    font-family: var(--AvenirBlack), sans-serif;
+  }
+
+  .font-avenir-bold {
+    font-family: var(--AvenirBold), sans-serif;
+  }
+
+  .font-avenir-regular {
+    font-family: var(--AvenirRegular), sans-serif;
+  }
+}
