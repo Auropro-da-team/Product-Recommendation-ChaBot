@@ -250,36 +250,41 @@ Generate a friendly response (3-4 lines) that:
 3. Provides Order ID, status, and dates
 4. Sounds natural
 
-Respond in JSON with complete order details:
+CRITICAL: Respond with COMPLETE order objects. Use the EXACT schema below:
+
 {{
-"chatbot_response": "Your YES response",
-"orders": [
+  "chatbot_response": "Your YES response starting with 'Yes!'",
+  "orders": [
     {{
-    "Order ID": "O1001",
-    "Date of Order": "15/04/25",
-    "Order Status": "Delivered",
-    "Date of Delivery": "20/04/25",
-    "Quantity": "1",
-    "Product Name": "Product Name",
-    "Customer Name": "Customer Name",
-    "Email ID": "email@example.com",
-    "Product ID": "P001",
-    "Customer ID": "C001"
+      "Order ID": "O1001",
+      "Date of Order": "15/04/25",
+      "Order Status": "Delivered",
+      "Date of Delivery": "20/04/25",
+      "Quantity": "1",
+      "Product Name": "Product Name",
+      "Customer Name": "Customer Name",
+      "Email ID": "email@example.com",
+      "Product ID": "P001",
+      "Customer ID": "C001"
     }}
-]
+  ]
 }}
 
-CRITICAL: Include ALL order fields in the response, not just chatbot_response.
+Include ALL fields for each order object. Do not use simplified field names.
 """
                         comparison_result = self.agent.run(comparison_prompt).content
                         parsed_result = clean_chatbot_response(comparison_result)
                         
-                        if isinstance(parsed_result, dict):
-                            response_json["chatbot_response"] = parsed_result.get("chatbot_response", "Yes! You ordered some of the recommended products.")
-                            # Use matched_orders to ensure we have complete data
-                            response_json["orders"] = parsed_result.get("orders", matched_orders)
+                        if isinstance(parsed_result, dict) and "chatbot_response" in parsed_result:
+                            response_json["chatbot_response"] = parsed_result["chatbot_response"]
+                            # Use AI-provided orders if valid, otherwise use matched_orders
+                            if parsed_result.get("orders") and len(parsed_result["orders"]) > 0:
+                                response_json["orders"] = self._ensure_complete_order_data(parsed_result["orders"])
+                            else:
+                                response_json["orders"] = matched_orders
                         else:
-                            response_json["chatbot_response"] = comparison_result
+                            # AI didn't return proper JSON, use our data
+                            response_json["chatbot_response"] = "Yes! You ordered some of the recommended products. Please see the details below."
                             response_json["orders"] = matched_orders
                     else:
                         # NO - user did NOT order recommended products
@@ -307,16 +312,41 @@ Generate a friendly response (3-4 lines) that:
 3. Provides their Order ID and order status
 4. Optionally offers more info about recommended products
 
-Example: "No, you haven't ordered the Silver Full Rim Clubmaster or Gray Transparent Full Rim Aviator that I recommended. However, you did order the Gray Full Rim Round which was delivered on April 19th. Would you like to know more about my other recommendations?"
+CRITICAL: Return COMPLETE order objects with ALL fields:
 
-
-Respond in JSON with complete order details:
 {{
-"chatbot_response": "Your friendly response starting with NO",
-"orders": [their actual orders for reference]
+  "chatbot_response": "Your friendly response starting with 'No'",
+  "orders": [
+    {{
+      "Order ID": "O1001",
+      "Date of Order": "15/04/25",
+      "Order Status": "Delivered",
+      "Date of Delivery": "18/04/25",
+      "Quantity": "3",
+      "Product Name": "Product Name",
+      "Customer Name": "Customer Name",
+      "Email ID": "email@example.com",
+      "Product ID": "P017",
+      "Customer ID": "C001"
+    }}
+  ]
 }}
+
+Do not use simplified field names. Include ALL fields for each order.
 """
-                        response_json["chatbot_response"] = self.agent.run(no_match_prompt).content
+                        no_match_result = self.agent.run(no_match_prompt).content
+                        parsed_result = clean_chatbot_response(no_match_result)
+                        
+                        if isinstance(parsed_result, dict) and "chatbot_response" in parsed_result:
+                            response_json["chatbot_response"] = parsed_result["chatbot_response"]
+                            if parsed_result.get("orders") and len(parsed_result["orders"]) > 0:
+                                response_json["orders"] = self._ensure_complete_order_data(parsed_result["orders"])
+                            else:
+                                response_json["orders"] = retrieved_orders
+                        else:
+                            # AI didn't return proper JSON, use our data
+                            response_json["chatbot_response"] = f"No, you haven't ordered the recommended products. Your actual orders are shown below."
+                            response_json["orders"] = retrieved_orders
                 else:
                     # Regular order query (not comparison)
                     logger.info("📦 REGULAR ORDER QUERY MODE (not comparison)")
@@ -334,23 +364,53 @@ Conversation history: {conversation_history}
 User query: {user_input}
 Retrieved orders: {order_info}
 
-Generate a conversational response (3-4 lines) summarizing order information.
+Generate a conversational response (3-4 lines) summarizing the order information.
+Be specific about order details like Order ID, product name, status, and delivery date.
 
-Respond in JSON with ALL order fields:
+CRITICAL: Return your response with COMPLETE order objects using this EXACT schema:
+
 {{
-"chatbot_response": "Your response",
-"orders": [complete order objects with all fields]
+  "chatbot_response": "Your 3-4 line conversational response about their orders",
+  "orders": [
+    {{
+      "Order ID": "O1001",
+      "Date of Order": "15/04/25",
+      "Order Status": "Delivered",
+      "Date of Delivery": "18/04/25",
+      "Quantity": "3",
+      "Product Name": "Product Name",
+      "Customer Name": "Customer Name",
+      "Email ID": "email@example.com",
+      "Product ID": "P017",
+      "Customer ID": "C001"
+    }}
+  ]
 }}
+
+Do NOT use simplified field names. Include ALL fields for each order object.
 """
                     
                     order_result = self.agent.run(order_retrieval_prompt).content
                     parsed_result = clean_chatbot_response(order_result)
                     
-                    if isinstance(parsed_result, dict):
-                        response_json["chatbot_response"] = parsed_result.get("chatbot_response", "Here's your order information:")
-                        response_json["orders"] = parsed_result.get("orders", retrieved_orders)
+                    if isinstance(parsed_result, dict) and "chatbot_response" in parsed_result:
+                        response_json["chatbot_response"] = parsed_result["chatbot_response"]
+                        # Use AI-provided orders if valid, otherwise use retrieved_orders
+                        if parsed_result.get("orders") and len(parsed_result["orders"]) > 0:
+                            response_json["orders"] = self._ensure_complete_order_data(parsed_result["orders"])
+                        else:
+                            response_json["orders"] = retrieved_orders
                     else:
-                        response_json["chatbot_response"] = order_result
+                        # FIXED: AI didn't return proper JSON, provide fallback
+                        if retrieved_orders:
+                            first_order = retrieved_orders[0]
+                            response_json["chatbot_response"] = (
+                                f"I found your order! Order #{first_order['Order ID']} for "
+                                f"{first_order['Product Name']} was {first_order['Order Status'].lower()} "
+                                f"on {first_order['Date of Delivery']}."
+                            )
+                        else:
+                            response_json["chatbot_response"] = "Here's your order information:"
                         response_json["orders"] = retrieved_orders
             else:
                 # No orders found
@@ -377,10 +437,17 @@ Respond in JSON with ALL order fields:
                     else:
                         response_json["chatbot_response"] = "Please provide your Order ID, email, or full name to look up your order."
         
-        chatbot_response = response_json.get(
-            "chatbot_response",
-            "I'm sorry, I couldn't understand your request."
-        )
+        # FIXED: Always ensure we have a proper chatbot_response
+        chatbot_response = response_json.get("chatbot_response", "").strip()
+        
+        if not chatbot_response:
+            # Fallback if chatbot_response is empty
+            if retrieved_orders:
+                chatbot_response = "I found your order information. Please see the details below."
+            elif retrieved_products:
+                chatbot_response = "I found some products that match your query. Please see the recommendations below."
+            else:
+                chatbot_response = "I'm sorry, I couldn't find specific information for your request. Could you please provide more details?"
         
         # Clean response
         if response_json.get("run_retrieval_products", False) or response_json.get("run_retrieval_orders", False):
@@ -394,11 +461,15 @@ Respond in JSON with ALL order fields:
                     "orders": retrieved_orders
                 }
             else:
+                # Ensure we have the actual chatbot response text
+                if "chatbot_response" not in cleaned_response or not cleaned_response["chatbot_response"]:
+                    cleaned_response["chatbot_response"] = chatbot_response
+                
                 # Ensure products and orders are in the response
                 if "products" not in cleaned_response:
                     cleaned_response["products"] = retrieved_products
                 if "orders" not in cleaned_response:
-                    cleaned_response["orders"] = retrieved_orders
+                    cleaned_response["orders"] = retrieved_orders if retrieved_orders else response_json.get("orders", [])
         else:
             cleaned_response = {
                 "chatbot_response": chatbot_response,
@@ -408,15 +479,14 @@ Respond in JSON with ALL order fields:
         
         # Log results
         if isinstance(cleaned_response, dict):
-            if "products" in cleaned_response:
+            if "products" in cleaned_response and cleaned_response["products"]:
                 logger.info(cleaned_response.get("chatbot_response", "Response generated"))
                 logger.info(format_product_table(cleaned_response["products"]))
             
-            if "orders" in cleaned_response:
+            if "orders" in cleaned_response and cleaned_response["orders"]:
                 logger.info(cleaned_response.get("chatbot_response", "Response generated"))
                 logger.info(format_order_table(cleaned_response["orders"]))
         else:
-            # If cleaned_response is a string, log it directly
             logger.info(f"Response: {cleaned_response}")
         
         send_invoice = response_json.get("send_invoice_email", False) and len(retrieved_orders) > 0
