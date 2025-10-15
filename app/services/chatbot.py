@@ -179,26 +179,46 @@ Return JSON:
             retrieved_products = self.search_service.search_products(user_input)
             
             if retrieved_products and len(retrieved_products) > 0:
+                # Generate conversational response using AI
                 product_info = "\n".join([
                     f"🕶 Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
-                    f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, Face Shape: {p['Face Shape']}, "
-                    f"Image: {p['Image URL']}, Prescription: {p['Prescription Type']}, "
-                    f"Frame: {p['Frame Colour']}, Lens: {p['Lens Color']}"
+                    f"Discount: {p['Discount']}, Suitable for: {p['Activity']}, Face Shape: {p['Face Shape']}, "
+                    f"Prescription: {p['Prescription Type']}, Frame: {p['Frame Colour']}, Lens: {p['Lens Color']}"
                     for p in retrieved_products
                 ])
                 
                 retrieval_prompt = f"""
 Conversation history: {conversation_history}
 User query: {user_input}
-Retrieved products: {product_info}
+Retrieved products:
+{product_info}
 
-Generate a conversational response (3-4 lines) recommending the best products with logical explanations.
-Always include complete info: Product ID, price, discount, and why it's suitable.
+Generate ONLY a conversational response (3-4 lines) recommending the best products with logical explanations.
+Explain why these products are suitable based on their features.
 
-Respond in JSON format with products array.
+IMPORTANT: Do NOT include product objects in your response. Just provide the conversational text.
 """
                 
-                response_json["chatbot_response"] = self.agent.run(retrieval_prompt).content
+                ai_response = self.agent.run(retrieval_prompt).content.strip()
+                
+                # Clean any JSON formatting from AI response if present
+                import re
+                json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                if json_match:
+                    # AI returned JSON, extract just the chatbot_response field
+                    try:
+                        parsed = clean_chatbot_response(ai_response)
+                        if isinstance(parsed, dict) and "chatbot_response" in parsed:
+                            ai_response = parsed["chatbot_response"]
+                    except:
+                        pass
+                
+                # Remove markdown code blocks if present
+                ai_response = re.sub(r'```json\s*|\s*```', '', ai_response).strip()
+                
+                # Set the conversational response and use the ORIGINAL retrieved_products
+                response_json["chatbot_response"] = ai_response
+                response_json["products"] = retrieved_products  # ALWAYS use complete products from ChromaDB
         
         # Process order retrieval
         if response_json.get("run_retrieval_orders", False):
@@ -442,40 +462,19 @@ Do NOT use simplified field names. Include ALL fields for each order object.
         
         if not chatbot_response:
             # Fallback if chatbot_response is empty
-            if retrieved_orders:
+            if retrieved_orders or response_json.get("orders"):
                 chatbot_response = "I found your order information. Please see the details below."
-            elif retrieved_products:
+            elif retrieved_products or response_json.get("products"):
                 chatbot_response = "I found some products that match your query. Please see the recommendations below."
             else:
                 chatbot_response = "I'm sorry, I couldn't find specific information for your request. Could you please provide more details?"
         
-        # Clean response
-        if response_json.get("run_retrieval_products", False) or response_json.get("run_retrieval_orders", False):
-            cleaned_response = clean_chatbot_response(chatbot_response)
-            
-            # CRITICAL: Ensure cleaned_response is always a dict structure
-            if not isinstance(cleaned_response, dict):
-                cleaned_response = {
-                    "chatbot_response": str(cleaned_response),
-                    "products": retrieved_products,
-                    "orders": retrieved_orders
-                }
-            else:
-                # Ensure we have the actual chatbot response text
-                if "chatbot_response" not in cleaned_response or not cleaned_response["chatbot_response"]:
-                    cleaned_response["chatbot_response"] = chatbot_response
-                
-                # Ensure products and orders are in the response
-                if "products" not in cleaned_response:
-                    cleaned_response["products"] = retrieved_products
-                if "orders" not in cleaned_response:
-                    cleaned_response["orders"] = retrieved_orders if retrieved_orders else response_json.get("orders", [])
-        else:
-            cleaned_response = {
-                "chatbot_response": chatbot_response,
-                "products": [],
-                "orders": []
-            }
+        # Build final response - NEVER parse chatbot_response for products/orders
+        cleaned_response = {
+            "chatbot_response": chatbot_response,
+            "products": response_json.get("products", retrieved_products if retrieved_products else []),
+            "orders": response_json.get("orders", retrieved_orders if retrieved_orders else [])
+        }
         
         # Log results
         if isinstance(cleaned_response, dict):
