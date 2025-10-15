@@ -147,7 +147,7 @@ Return JSON:
             
             if retrieved_products and len(retrieved_products) > 0:
                 product_info = "\n".join([
-                    f"🕶 Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']}, "
+                    f"🕶 Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
                     f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, Face Shape: {p['Face Shape']}, "
                     f"Image: {p['Image URL']}, Prescription: {p['Prescription Type']}, "
                     f"Frame: {p['Frame Colour']}, Lens: {p['Lens Color']}"
@@ -218,28 +218,45 @@ Respond in JSON format:
                         ])
                         
                         comparison_prompt = f"""
-The user originally asked: "Did I buy any of these before?"
-Then provided Order ID: {order_id_present}
+The user originally asked: "Did I order any of these earlier?" referring to products I recommended.
 
-Previously recommended Product IDs: {previously_recommended_product_ids}
-User's order history shows Product IDs: {ordered_product_ids}
-MATCHES FOUND: {matching_products}
+RECOMMENDED PRODUCTS (what I suggested): {previously_recommended_product_ids}
+ACTUAL ORDERED PRODUCTS (what they bought): {ordered_product_ids}
+
+RESULT: MATCH FOUND! Product IDs {matching_products} appear in BOTH lists.
 
 Matching order details:
 {order_details}
 
 Generate a friendly, conversational response (3-4 lines) that:
-1. STARTS WITH "Yes!" or "Yes, you did!" to clearly confirm they ordered recommended products
-2. Mentions the specific product name and Product ID they bought
-3. Provides Order ID, order status, and key dates
-4. Sounds natural and helpful
+1. STARTS WITH "Yes!" or "Yes, you did!" to clearly confirm they DID order the recommended product(s)
+2. Be specific about which recommended product they ordered
+3. Provide Order ID, order status, delivery date, and quantity
+4. Sound natural and helpful
 
-Example: "Yes! You ordered the Gray Full Rim Round (Product ID: P040) that I recommended. Your order O1002 was delivered on April 19th, 2025. You ordered 2 units."
+Example: "Yes! You ordered the Gray Full Rim Round (Product ID: P040) that I recommended. Your order O1002 was placed on April 15th and delivered on April 19th. You ordered 2 units."
+
+CRITICAL RULES:
+- Only mention products that are in the MATCHING list: {matching_products}
+- Return ALL order fields including Order ID, Date of Order, Order Status, Date of Delivery, Quantity, Product Name, Customer Name, Email ID, Customer ID, and Product ID
 
 Respond in JSON:
 {{
-"chatbot_response": "Your friendly confirmation response starting with YES",
-"orders": [matching orders with all fields]
+"chatbot_response": "Your friendly confirmation starting with YES",
+"orders": [
+    {{
+    "Order ID": "O1002",
+    "Date of Order": "2025-04-15",
+    "Order Status": "Delivered",
+    "Date of Delivery": "2025-04-19",
+    "Quantity": "2",
+    "Product Name": "Gray Full Rim Round",
+    "Customer Name": "John Doe",
+    "Email ID": "customer@example.com",
+    "Customer ID": "CUST123",
+    "Product ID": "P040"
+    }}
+]
 }}
 """
                         response_json["chatbot_response"] = self.agent.run(comparison_prompt).content
@@ -252,28 +269,47 @@ Respond in JSON:
                         ])
                         
                         no_match_prompt = f"""
-The user originally asked: "Did I buy any of these before?"
-Then provided Order ID: {order_id_present}
+The user originally asked: "Did I order any of these earlier?" referring to products I recommended.
 
-Previously recommended Product IDs: {previously_recommended_product_ids}
-User's actual order history shows Product IDs: {ordered_product_ids}
-NO MATCHES - they didn't order any recommended products
+RECOMMENDED PRODUCTS (what I suggested): {previously_recommended_product_ids}
+ACTUAL ORDERED PRODUCTS (what they bought): {ordered_product_ids}
 
-Their actual order history:
+RESULT: NO MATCH - The user did NOT order any of the products I recommended.
+
+Their actual order history (different products):
 {all_order_details}
 
 Generate a friendly response (3-4 lines) that:
-1. STARTS WITH "No" or "No, you haven't" to clearly state they didn't order recommended products
-2. Mentions what they actually ordered (product name and Product ID)
-3. Provides their Order ID and order status
-4. Optionally offers more info about recommended products
+1. STARTS WITH "No, you haven't ordered" to clearly state they didn't order the RECOMMENDED products
+2. Be specific: "You haven't ordered the Gray Full Rim Round (P040) or Black Full Rim Clubmaster (P025) that I recommended."
+3. Then mention what they ACTUALLY ordered: "However, you did order the Light Gunmetal Full Rim Aviator (Product ID: P017) which was delivered on April 25th."
+4. Optionally ask if they want more info about the recommended products
 
-Example: "No, you haven't ordered the Silver Full Rim Clubmaster (P044) or Gray Transparent Full Rim Aviator (P020) that I recommended. However, you did order the Gray Full Rim Round (Product ID: P040) which was delivered on April 19th. Would you like to know more about my other recommendations?"
+CRITICAL RULES:
+- Do NOT say they didn't order something if it's in their order history
+- Be clear about the distinction between RECOMMENDED products vs ACTUALLY ORDERED products
+- Return ALL order fields including Order ID, Date of Order, Order Status, Date of Delivery, Quantity, Product Name, Customer Name, Email ID, Customer ID, and Product ID
+
+Example response:
+"No, you haven't ordered the Gray Full Rim Round (P040) or Black Full Rim Clubmaster (P025) that I recommended. However, according to your order history, you previously ordered the Light Gunmetal Full Rim Aviator (Product ID: P017) on April 15th, which was delivered on April 25th. Would you like to know more about my recommended products?"
 
 Respond in JSON:
 {{
-"chatbot_response": "Your friendly response starting with NO",
-"orders": [their actual orders for reference]
+"chatbot_response": "Your clear, accurate response",
+"orders": [
+    {{
+    "Order ID": "O1001",
+    "Date of Order": "2025-04-15",
+    "Order Status": "Delivered",
+    "Date of Delivery": "2025-04-25",
+    "Quantity": "1",
+    "Product Name": "Light Gunmetal Full Rim Aviator",
+    "Customer Name": "John Doe",
+    "Email ID": "likith@example.com",
+    "Customer ID": "CUST001",
+    "Product ID": "P017"
+    }}
+]
 }}
 """
                         response_json["chatbot_response"] = self.agent.run(no_match_prompt).content
@@ -298,21 +334,23 @@ Generate a conversational response (3-4 lines) summarizing order information.
 Include Product ID, Order ID, status, and delivery date.
 Be natural and helpful.
 
+CRITICAL: Return ALL order fields in the response including Order ID, Date of Order, Order Status, Date of Delivery, Quantity, Product Name, Customer Name, Email ID, Customer ID, and Product ID.
+
 Respond in JSON:
 {{
 "chatbot_response": "Here's your order information:",
 "orders": [
     {{
     "Order ID": "O1010",
-    "Email ID": "customer@example.com",
-    "Product Name": "Product 1",
-    "Product ID": "P001",
     "Date of Order": "2025-04-01",
     "Order Status": "Delivered",
     "Date of Delivery": "2025-04-10",
     "Quantity": "1",
+    "Product Name": "Product 1",
+    "Customer Name": "John Doe",
+    "Email ID": "customer@example.com",
     "Customer ID": "CUST123",
-    "Customer Name": "John Doe"
+    "Product ID": "P001"
     }}
 ]
 }}

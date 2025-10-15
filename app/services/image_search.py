@@ -30,6 +30,19 @@ class ImageSearchService:
             return default
         return value
     
+    def _format_discount(self, discount_value: Any) -> str:
+        """Format discount as percentage string for display."""
+        try:
+            discount_float = float(discount_value)
+            # Format based on whether it's a whole number or has decimals
+            if discount_float == int(discount_float):
+                return f"{int(discount_float)}%"
+            else:
+                # Keep up to 2 decimal places, remove trailing zeros
+                return f"{discount_float:.2f}%".rstrip('0').rstrip('.')
+        except (ValueError, TypeError):
+            return "0%"
+    
     def search_by_image(
         self,
         image_file: bytes,
@@ -102,12 +115,14 @@ class ImageSearchService:
                     
                     # Build result with safe metadata extraction
                     try:
+                        # Get discount as float and format it for display
+                        discount_value = self._safe_get_metadata(meta, "Discount")
                         result = {
                             "Product ID": self._safe_get_metadata(meta, "Product ID"),
                             "Product Name": self._safe_get_metadata(meta, "Product Name"),
                             "Brand Name": self._safe_get_metadata(meta, "Brand Name"),
                             "Price": float(self._safe_get_metadata(meta, "Price")),
-                            "Discount": float(self._safe_get_metadata(meta, "Discount")),
+                            "Discount": self._format_discount(discount_value),
                             "Activity": self._safe_get_metadata(meta, "Activity"),
                             "Face Shape": self._safe_get_metadata(meta, "Face Shape"),
                             "Product Type": self._safe_get_metadata(meta, "Product Type"),

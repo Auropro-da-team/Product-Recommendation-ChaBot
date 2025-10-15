@@ -12,6 +12,19 @@ class SearchService:
         self.chroma_manager = chroma_manager
         self.agent = agent
     
+    def _format_discount(self, discount_value: Any) -> str:
+        """Format discount as percentage string for display."""
+        try:
+            discount_float = float(discount_value)
+            # Format based on whether it's a whole number or has decimals
+            if discount_float == int(discount_float):
+                return f"{int(discount_float)}%"
+            else:
+                # Keep up to 2 decimal places, remove trailing zeros
+                return f"{discount_float:.2f}%".rstrip('0').rstrip('.')
+        except (ValueError, TypeError):
+            return "0%"
+    
     def search_products(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """
         Search for products using semantic similarity.
@@ -46,6 +59,8 @@ class SearchService:
                 ascending=[True, False]
             )
             results_df.drop(columns=["Price Difference"], inplace=True)
+        
+        results_df["Discount"] = results_df["Discount"].apply(self._format_discount)
         
         return results_df[[
             'Product ID', 'Product Name', 'Price', 'Brand Name', 'Discount', 

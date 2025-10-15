@@ -189,7 +189,7 @@ async def chat_with_image(
         else:
             # Create hybrid prompt with image search results - INCLUDE Product ID
             product_info = "\n".join([
-                f"🕶️ Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']} INR, "
+                f"🕶️ Product ID: {p.get('Product ID', 'N/A')}, {p['Product Name']} ({p['Brand Name']}) - Price: {p['Price']}, "
                 f"Discount: {p['Discount']}%, Suitable for: {p['Activity']}, "
                 f"Face Shape: {p['Face Shape']} \n🌄 Image: {p['Image URL']}, "
                 f"frame color: {p['Frame Colour']}, lens color: {p['Lens Color']}"

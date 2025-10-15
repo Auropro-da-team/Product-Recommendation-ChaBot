@@ -28,9 +28,30 @@ def format_product_table(products: List[Dict[str, Any]]) -> str:
     return df.to_string(index=False)
 
 def format_order_table(orders: List[Dict[str, Any]]) -> str:
-    """Format orders as a string table."""
+    """
+    Format orders as a string table with ALL required fields.
+    Required fields: Order ID, Date of Order, Order Status, Date of Delivery,
+                     Quantity, Product Name, Customer Name
+    """
     if not orders:
         return "No orders found"
     df = pd.DataFrame(orders)
-    return df.to_string(index=False)
-
+    
+    required_columns = [
+        'Order ID',
+        'Date of Order',
+        'Order Status',
+        'Date of Delivery',
+        'Quantity',
+        'Product Name',
+        'Customer Name'
+    ]
+    
+    available_columns = [col for col in required_columns if col in df.columns]
+    
+    if not available_columns:
+        # Fallback: show all columns if required ones are missing
+        return df.to_string(index=False)
+    
+    # Return formatted table with required columns
+    return df[available_columns].to_string(index=False)
