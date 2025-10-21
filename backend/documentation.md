@@ -1,4 +1,4 @@
-# Essilor Eyewear Chatbot - Backend Documentation
+# Eyewear Chatbot - Backend Documentation
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -117,7 +117,7 @@ Automated invoice generation:
 - Order ID and product name
 - Quantity and dates (order/delivery)
 - Order status
-- Company branding (Essilor)
+- Company branding ()
 
 ### 6. **Conversation Management**
 
@@ -446,11 +446,11 @@ Bot: "Yes! You ordered P017 (Light Gunmetal Full Rim Aviator)
 
 **Invoice Content:**
 ```
-Subject: Essilor Order Confirmation - Order ID: O1001
+Subject:  Order Confirmation - Order ID: O1001
 
 Dear Likith Gannarapu,
 
-Thank you for your order with Essilor!
+Thank you for your order with !
 
 Order Details:
 - Order ID: O1001
@@ -463,7 +463,7 @@ Order Details:
 Contact support if you have questions.
 
 Best regards,
-The Essilor Team
+The  Team
 ```
 
 **Trigger Conditions:**
@@ -581,7 +581,7 @@ chat_sessions/
 
 **Buckets:**
 
-**1. `essilor-eyewear`** (Product Images)
+**1. `-eyewear`** (Product Images)
 ```
 images/
   {index}_{product_name}.jpg
@@ -590,7 +590,7 @@ embeddings/
   image_features_db.npz
 ```
 
-**2. `essilor-eyewear-images`** (User Uploads)
+**2. `-eyewear-images`** (User Uploads)
 ```
 user_uploads/
   {session_id}/
