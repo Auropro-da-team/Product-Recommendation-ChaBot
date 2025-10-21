@@ -14,7 +14,7 @@
 
 ## Overview
 
-The Essilor Eyewear Chatbot Backend is an intelligent conversational AI system designed to help customers discover eyewear products, track orders, and get personalized recommendations. It combines natural language processing, computer vision, and semantic search to deliver a seamless shopping experience.
+The Eyewear Chatbot Backend is an intelligent conversational AI system designed to help customers discover eyewear products, track orders, and get personalized recommendations. It combines natural language processing and semantic search to deliver a seamless shopping experience.
 
 ### What This Application Can Do
 
