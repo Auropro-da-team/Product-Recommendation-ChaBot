@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import Chatbot from "./components/cbs";
+import Chatbot from "./components/Chatbot";
 import ChatHistory from "./components/ChatHistory";
 import {
   fetchChatHistory,
