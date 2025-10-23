@@ -141,7 +141,7 @@ Sophisticated conversation handling:
 
 ### High-Level Architecture
 
-![Image Description: USER JOURNEY](user_journey.png)
+![Image Description: USER JOURNEY](architecture.png)
 
 ---
 
