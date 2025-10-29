@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    
+    volumes:
+      - ..:/workspace:cached
+      - vscode-extensions:/home/vscode/.vscode-server/extensions
+      - vscode-extensions-insiders:/home/vscode/.vscode-server-insiders/extensions
+    
+    command: sleep infinity
+    
+    environment:
+      # Python
+      PYTHONUNBUFFERED: 1
+      PYTHONDONTWRITEBYTECODE: 1
+      
+      # Google Cloud (mount from host)
+      GOOGLE_APPLICATION_CREDENTIALS: /home/vscode/.config/gcloud/application_default_credentials.json
+      
+      # Backend environment variables
+      FIRESTORE_PROJECT_ID: ${FIRESTORE_PROJECT_ID:-prj-auropro-dev}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      HF_TOKEN: ${HF_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-gpt-4o}
+      
+      # Frontend environment variable
+      VITE_BACKEND_URL: http://localhost:8000
+    
+    ports:
+      - "8000:8000"  # FastAPI
+      - "5173:5173"  # Vite
+    
+    networks:
+      - app-network
+    
+    depends_on:
+      - chromadb
+
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes:
+      - chroma-data:/chroma/chroma
+    ports:
+      - "8001:8000"
+    networks:
+      - app-network
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+
+volumes:
+  vscode-extensions:
+  vscode-extensions-insiders:
+  chroma-data:
+
+networks:
+  app-network:
+    driver: bridge
