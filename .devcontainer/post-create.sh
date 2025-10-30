@@ -27,5 +27,5 @@ sudo chown -R vscode:vscode /home/vscode
 sudo chmod -R 755 /home/vscode
 
 echo "✅ Post-create setup complete!"
-echo "👉 To start the backend: cd backend && uvicorn main:app --reload --host 0.0.0.0"
-echo "👉 To start the frontend: cd frontend && npm run dev"
+echo "👉 To start the backend: cd backend && uvicorn main:app --host 0.0.0.0"
+echo "👉 To start the frontend: cd frontend && npm run dev -- --host"
