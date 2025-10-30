@@ -1,56 +1,31 @@
-# Use official Python base with Node.js
-FROM mcr.microsoft.com/devcontainers/python:3.11
+#!/bin/bash
 
-# Install Node.js 20.x
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@latest
+# This script runs after the container is created
 
-# Install additional system dependencies
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install --no-install-recommends \
-        build-essential \
-        curl \
-        git \
-        wget \
-        vim \
-        postgresql-client \
-        libpq-dev \
-        libjpeg-dev \
-        libpng-dev \
-        libfreetype6-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+echo "🚀 Running post-create setup..."
 
-# Install Python tools
-RUN pip install --upgrade pip setuptools wheel
+# Verify Python installation
+python --version
+pip --version
 
-# Install common Python development tools
-RUN pip install \
-    black \
-    flake8 \
-    pylint \
-    pytest \
-    pytest-cov \
-    ipython \
-    ipdb
+# Verify Node.js installation
+node --version
+npm --version
 
-# Set working directory
-WORKDIR /workspace
+# Install frontend dependencies if package.json exists
+if [ -f "frontend/package.json" ]; then
+    echo "📦 Installing frontend dependencies..."
+    cd frontend
+    npm install
+    cd ..
+else
+    echo "⚠️  frontend/package.json not found, skipping npm install"
+fi
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt /tmp/backend-requirements.txt
-RUN pip install -r /tmp/backend-requirements.txt
+# Set proper permissions
+sudo chown -R vscode:vscode /home/vscode
+sudo chmod -R 755 /home/vscode
 
-# Install frontend dependencies (if package.json exists)
-COPY frontend/package*.json /tmp/frontend/
-RUN cd /tmp/frontend && npm install
-
-# Create non-root user (vscode user is already created by base image)
-# Configure shell
-RUN echo 'alias ll="ls -lah"' >> /home/vscode/.bashrc \
-    && echo 'alias gs="git status"' >> /home/vscode/.bashrc \
-    && echo 'export PS1="\[\e[36m\]🐳 devcontainer\[\e[m\] \[\e[33m\]\w\[\e[m\] \$ "' >> /home/vscode/.bashrc
-
-# Set user
-USER vscode
+echo "✅ Post-create setup complete!"
+echo "👉 To start the backend: cd backend && uvicorn main:app --reload --host 0.0.0.0"
+echo "👉 To start the frontend: cd frontend && npm run dev"

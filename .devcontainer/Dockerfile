@@ -1,11 +1,25 @@
 FROM python:3.11-slim-bullseye
 
-# Install system dependencies
+# Install system dependencies including Node.js
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     sudo \
+    build-essential \
+    wget \
+    vim \
+    ca-certificates \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create vscode user with sudo privileges
 RUN useradd -m -s /bin/bash vscode && \
@@ -21,14 +35,23 @@ WORKDIR /workspace
 COPY backend/requirements.txt /tmp/requirements.txt
 
 # Install Python dependencies as root
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
+
+# Install Python development tools
+RUN pip install black flake8 pylint pytest pytest-cov ipython ipdb
 
 # Ensure workspace permissions
 RUN mkdir -p /workspace && chown -R vscode:vscode /workspace
 
 # Set vscode as the default user
 USER vscode
+
+# Configure shell aliases
+RUN echo 'alias ll="ls -lah"' >> /home/vscode/.bashrc && \
+    echo 'alias gs="git status"' >> /home/vscode/.bashrc && \
+    echo 'export PS1="\[\e[36m\]🐳 devcontainer\[\e[m\] \[\e[33m\]\w\[\e[m\] \$ "' >> /home/vscode/.bashrc
 
 # Set environment variables
 ENV PATH="/home/vscode/.local/bin:${PATH}"
