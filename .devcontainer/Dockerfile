@@ -1,6 +1,6 @@
 FROM python:3.11-slim-bullseye
 
-# Install system dependencies including Node.js
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -10,7 +10,22 @@ RUN apt-get update && apt-get install -y \
     vim \
     ca-certificates \
     gnupg \
+    libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install newer SQLite3 from source (required for ChromaDB)
+RUN wget https://www.sqlite.org/2024/sqlite-autoconf-3450100.tar.gz && \
+    tar xvfz sqlite-autoconf-3450100.tar.gz && \
+    cd sqlite-autoconf-3450100 && \
+    ./configure --prefix=/usr/local && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf sqlite-autoconf-3450100 sqlite-autoconf-3450100.tar.gz && \
+    ldconfig
+
+# Set SQLite library path
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 # Install Node.js 20.x
 RUN mkdir -p /etc/apt/keyrings && \
@@ -56,3 +71,4 @@ RUN echo 'alias ll="ls -lah"' >> /home/vscode/.bashrc && \
 # Set environment variables
 ENV PATH="/home/vscode/.local/bin:${PATH}"
 ENV PYTHONUNBUFFERED=1
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
